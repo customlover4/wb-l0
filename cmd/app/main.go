@@ -9,7 +9,6 @@ import (
 	webapp "first-task/internal/web-app"
 	"first-task/pkg/logger"
 	"flag"
-	"fmt"
 
 	"go.uber.org/zap"
 )
@@ -20,7 +19,6 @@ func main() {
 	flag.Parse()
 
 	cfg := config.MustLoad(*configFile)
-	fmt.Println(cfg)
 	str := storage.NewStorage(
 		redisStorage.NewRedisStorage(cfg.RedisConfig),
 		postgres.NewPostgres(cfg.PostgresConfig),

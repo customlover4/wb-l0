@@ -25,6 +25,7 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 		Partition: 0,
 		MinBytes:  cfg.MinBytes,
 		MaxBytes:  cfg.MaxBytes,
+		GroupID:   cfg.GroupID,
 	})
 	defer reader.Close()
 
@@ -52,6 +53,12 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 			zap.L().Error(
 				fmt.Sprintf("wrong json in %s topic(kafka)", Topic),
 			)
+			err = reader.CommitMessages(context.Background(), msg)
+			if err != nil {
+				zap.L().Error(
+					fmt.Sprintf("wrong on commititing msg %s", err.Error()),
+				)
+			}
 			continue
 		}
 
@@ -59,7 +66,7 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 		if err != nil {
 			zap.L().Error(
 				fmt.Sprintf(
-					"can't add this order to storage: %s", err.Error(),
+					"error on adding to db: %s", err.Error(),
 				),
 			)
 			continue
@@ -68,5 +75,12 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 		zap.L().Info(
 			fmt.Sprintf("new order succesfully added: %s", orderUID),
 		)
+
+		err = reader.CommitMessages(context.Background(), msg)
+		if err != nil {
+			zap.L().Error(
+				fmt.Sprintf("wrong on commititing msg %s", err.Error()),
+			)
+		}
 	}
 }
