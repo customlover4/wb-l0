@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f9f5ff;
+        color: #2d2d2d;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      h1 {
+        color: #5e35b1;
+        text-align: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #e1d5f7;
+      }
+      h3 {
+        color: #7c4dff;
+        margin-top: 30px;
+        margin-bottom: 15px;
+      }
+      .card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(125, 92, 255, 0.1);
+        padding: 25px;
+        margin-bottom: 30px;
+        border: 1px solid #e1d5f7;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 18px;
+      }
+      .info-item {
+        margin-bottom: 12px;
+        padding: 8px 0;
+        border-bottom: 1px dashed #e1d5f7;
+      }
+      .info-item strong {
+        display: inline-block;
+        width: 180px;
+        color: #7e57c2;
+        font-weight: 500;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        box-shadow: 0 2px 8px rgba(125, 92, 255, 0.1);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      th {
+        background-color: #7c4dff;
+        color: white;
+        padding: 14px;
+        text-align: left;
+        font-weight: 500;
+      }
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #f0ebfa;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f5ff;
+      }
+      tr:hover {
+        background-color: #f0ebfa;
+      }
+      .section-title {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .section-title h3 {
+        margin: 0;
+        margin-right: 15px;
+        color: #7c4dff;
+        font-size: 1.3em;
+      }
+      .section-title .divider {
+        flex-grow: 1;
+        height: 1px;
+        background-color: #e1d5f7;
+      }
+      .back-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        padding: 10px 20px;
+        background-color: #7c4dff;
+        color: white;
+        text-decoration: none;
+        border-radius: 25px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 5px rgba(124, 77, 255, 0.3);
+        font-weight: 500;
+      }
+      .back-link:hover {
+        background-color: #5e35b1;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(124, 77, 255, 0.3);
+      }
+      .back-link:active {
+        transform: translateY(0);
+      }
+      .divider-line {
+        height: 1px;
+        background: linear-gradient(
+          to right,
+          transparent,
+          #d1c4e9,
+          transparent
+        );
+        margin: 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <a href="/" class="back-link">← Назад к списку заказов</a>
+
+      <h1>Информация о заказе #{{ .OrderUID }}</h1>
+
+      <div class="card">
+        <div class="section-title">
+          <h3>Общая информация</h3>
+          <div class="divider"></div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <strong>Order UID:</strong> {{ .OrderUID }}
+          </div>
+          <div class="info-item">
+            <strong>Трек-номер:</strong> {{ .TrackNumber }}
+          </div>
+          <div class="info-item"><strong>Entry:</strong> {{ .Entry }}</div>
+          <div class="info-item"><strong>Локаль:</strong> {{ .Locale }}</div>
+          <div class="info-item">
+            <strong>Customer ID:</strong> {{ .CustomerID }}
+          </div>
+          <div class="info-item">
+            <strong>Служба доставки:</strong> {{ .DeliveryService }}
+          </div>
+          <div class="info-item">
+            <strong>Shardkey:</strong> {{ .ShardKey }}
+          </div>
+          <div class="info-item"><strong>SM ID:</strong> {{ .SMID }}</div>
+          <div class="info-item">
+            <strong>Дата создания:</strong> {{ .DateCreated }}
+          </div>
+          <div class="info-item">
+            <strong>OOF Shard:</strong> {{ .OOFShard }}
+          </div>
+          <div class="info-item">
+            <strong>Internal Signature:</strong> {{ .InternalSignature }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h3>Информация о доставке</h3>
+          <div class="divider"></div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <strong>Имя:</strong> {{ .Delivery.Name }}
+          </div>
+          <div class="info-item">
+            <strong>Телефон:</strong> {{ .Delivery.Phone }}
+          </div>
+          <div class="info-item">
+            <strong>Email:</strong> {{ .Delivery.Email }}
+          </div>
+          <div class="info-item">
+            <strong>Город:</strong> {{ .Delivery.City }}
+          </div>
+          <div class="info-item">
+            <strong>Регион:</strong> {{ .Delivery.Region }}
+          </div>
+          <div class="info-item">
+            <strong>Адрес:</strong> {{ .Delivery.Address }}
+          </div>
+          <div class="info-item">
+            <strong>Почтовый индекс:</strong> {{ .Delivery.Zip }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h3>Информация об оплате</h3>
+          <div class="divider"></div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item">
+            <strong>Транзакция:</strong> {{ .Payment.Transaction }}
+          </div>
+          <div class="info-item">
+            <strong>Request ID:</strong> {{ .Payment.RequestID }}
+          </div>
+          <div class="info-item">
+            <strong>Валюта:</strong> {{ .Payment.Currency }}
+          </div>
+          <div class="info-item">
+            <strong>Провайдер:</strong> {{ .Payment.Provider }}
+          </div>
+          <div class="info-item">
+            <strong>Сумма:</strong> {{ .Payment.Amount }}
+          </div>
+          <div class="info-item">
+            <strong>Дата оплаты:</strong> {{ .Payment.PaymentDT }}
+          </div>
+          <div class="info-item">
+            <strong>Банк:</strong> {{ .Payment.Bank }}
+          </div>
+          <div class="info-item">
+            <strong>Стоимость доставки:</strong> {{ .Payment.DeliveryCost }}
+          </div>
+          <div class="info-item">
+            <strong>Сумма товаров:</strong> {{ .Payment.GoodsTotal }}
+          </div>
+          <div class="info-item">
+            <strong>Доп. сбор:</strong> {{ .Payment.CustomFee }}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h3>Товары в заказе</h3>
+          <div class="divider"></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Артикул</th>
+              <th>Трэк номер</th>
+              <th>Цена</th>
+              <th>RID</th>
+              <th>Название</th>
+              <th>Скидка</th>
+              <th>Размер</th>
+              <th>Итого</th>
+              <th>NMID</th>
+              <th>Бренд</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range .Items }}
+            <tr>
+              <td>{{ .ChrtID }}</td>
+              <td>{{ .TrackNumber }}</td>
+              <td>{{ .Price }} {{ $.Payment.Currency }}</td>
+              <td>{{ .RID }}</td>
+              <td>{{ .Name }}</td>
+              <td>{{ .Sale }}%</td>
+              <td>{{ .Size }}</td>
+              <td>{{ .TotalPrice }} {{ $.Payment.Currency }}</td>
+              <td>{{ .NMID }}</td>
+              <td>{{ .Brand }}</td>
+              <td>{{ .Status }}</td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>

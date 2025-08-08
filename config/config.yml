@@ -1,0 +1,29 @@
+web_config:
+  host: "localhost"
+  port: "8080"
+  read_timeout: 10s
+  write_timeout: 10s
+
+postgres_config:
+  host: "localhost"
+  port: "5432"
+  user: "dev"
+  password: "qqq"
+  db_name: "mydb"
+  sslmode: false
+
+redis:
+  host: "localhost"
+  port: "6379"
+  password: ""
+  db_name: 0
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  topic: "orders"
+  partition: 0
+  min_bytes: 1
+  max_bytes: 10e6
+
+initial_data_size: 100
