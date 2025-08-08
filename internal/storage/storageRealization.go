@@ -27,13 +27,14 @@ func (s *Storage) AddOrder(ord *order.Order) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
-	s.localStorage.Add(ord)
+	// s.localStorage.Add(ord)
 
 	return nil
 }
 
 func (s *Storage) FindOrder(orderUID string) (*order.Order, error) {
 	const op = "internal.storage.FindOrder"
+
 	var result *order.Order
 	var err error
 
