@@ -18,6 +18,15 @@ const (
 	Topic = "orders"
 )
 
+func CommitMSG(reader *kafka.Reader, msg kafka.Message) {
+	err := reader.CommitMessages(context.Background(), msg)
+	if err != nil {
+		zap.L().Error(
+			fmt.Sprintf("wrong on commititing msg %s", err.Error()),
+		)
+	}
+}
+
 func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:   cfg.Brokers,
@@ -42,6 +51,8 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 
 		_, err = str.FindOrder(orderUID)
 		if err == nil && !errors.Is(err, postgres.ErrNotFound) {
+			zap.L().Info("Order allready exists and try add to db again")
+			CommitMSG(reader, msg)
 			continue
 		}
 
@@ -53,12 +64,7 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 			zap.L().Error(
 				fmt.Sprintf("wrong json in %s topic(kafka)", Topic),
 			)
-			err = reader.CommitMessages(context.Background(), msg)
-			if err != nil {
-				zap.L().Error(
-					fmt.Sprintf("wrong on commititing msg %s", err.Error()),
-				)
-			}
+			CommitMSG(reader, msg)
 			continue
 		}
 
@@ -76,11 +82,6 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 			fmt.Sprintf("new order succesfully added: %s", orderUID),
 		)
 
-		err = reader.CommitMessages(context.Background(), msg)
-		if err != nil {
-			zap.L().Error(
-				fmt.Sprintf("wrong on commititing msg %s", err.Error()),
-			)
-		}
+		CommitMSG(reader, msg)
 	}
 }
