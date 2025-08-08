@@ -27,7 +27,6 @@ func (s *Storage) AddOrder(ord *order.Order) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
-	// s.localStorage.Add(ord)
 
 	return nil
 }
