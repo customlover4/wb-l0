@@ -14,10 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	Topic = "orders"
-)
-
 func CommitMSG(reader *kafka.Reader, msg kafka.Message) {
 	err := reader.CommitMessages(context.Background(), msg)
 	if err != nil {
@@ -62,7 +58,7 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 		err = json.Unmarshal(jsonValue, &ord)
 		if err != nil {
 			zap.L().Error(
-				fmt.Sprintf("wrong json in %s topic(kafka)", Topic),
+				fmt.Sprintf("wrong json in %s topic(kafka)", cfg.Topic),
 			)
 			CommitMSG(reader, msg)
 			continue
