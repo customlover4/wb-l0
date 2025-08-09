@@ -30,3 +30,7 @@ func NewMapStorage() *MAPStorage {
 	}()
 	return r
 }
+
+func (ms MAPStorage) Shutdown() {
+
+}

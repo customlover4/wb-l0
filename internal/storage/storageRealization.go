@@ -8,13 +8,11 @@ import (
 )
 
 func (s *Storage) LoadInitialData(size int) {
-	const op = "internal.storage.StorageRealization.LoadInitialData"
-
 	zap.L().Info("start initialization cache")
 
 	ords, err := s.dataBaseStorage.GetInitialData(size)
 	if err != nil {
-		zap.L().Panic(fmt.Sprintf("%s: %s", op, err.Error()))
+		zap.L().Error("cant load initial cache")
 	}
 
 	s.localStorage.LoadInitialCache(ords)

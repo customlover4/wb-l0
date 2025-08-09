@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 const (
@@ -25,5 +26,11 @@ func NewRedisStorage(cfg config.RedisConfig) RedisStorage {
 			Password: cfg.Password,
 			DB:       cfg.DBName,
 		}),
+	}
+}
+
+func (rs RedisStorage) Shutdown() {
+	if err := rs.rdb.Close(); err != nil {
+		zap.L().Error(err.Error())
 	}
 }

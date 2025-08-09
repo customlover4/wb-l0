@@ -17,6 +17,11 @@ func NewStorage(ls Cacher, dbs DataBaser) *Storage {
 	}
 }
 
+func (s Storage) Shutdown() {
+	s.localStorage.Shutdown()
+	s.dataBaseStorage.Shutdown()
+}
+
 type Storager interface {
 	AddOrder(ord *order.Order) error
 	FindOrder(orderUID string) (*order.Order, error)
@@ -26,7 +31,8 @@ type Storager interface {
 type DataBaser interface {
 	Add(ord *order.Order) error
 	Find(orderUID string) (*order.Order, error)
-	GetInitialData(size int, ) ([]*order.Order, error)
+	GetInitialData(size int) ([]*order.Order, error)
+	Shutdown()
 }
 
 type Cacher interface {
@@ -34,4 +40,5 @@ type Cacher interface {
 	Find(orderUID string) *order.Order
 	Delete(orderUID string)
 	LoadInitialCache(ords []*order.Order)
+	Shutdown()
 }

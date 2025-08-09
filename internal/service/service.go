@@ -9,12 +9,34 @@ import (
 	"first-task/internal/storage"
 	"first-task/internal/storage/postgres"
 	"fmt"
+	"io"
 
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
 
-func CommitMSG(reader *kafka.Reader, msg kafka.Message) {
+type OrderReader struct {
+	reader *kafka.Reader
+	str    storage.Storager
+}
+
+func NewOrderReader(str storage.Storager, cfg config.KafkaOrdersConfig) *OrderReader {
+	return &OrderReader{
+		reader: kafka.NewReader(
+			kafka.ReaderConfig{
+				Brokers:   cfg.Brokers,
+				Topic:     cfg.Topic,
+				Partition: 0,
+				MinBytes:  cfg.MinBytes,
+				MaxBytes:  cfg.MaxBytes,
+				GroupID:   cfg.GroupID,
+			},
+		),
+		str: str,
+	}
+}
+
+func (or *OrderReader) commitMSG(reader *kafka.Reader, msg kafka.Message) {
 	err := reader.CommitMessages(context.Background(), msg)
 	if err != nil {
 		zap.L().Error(
@@ -23,32 +45,28 @@ func CommitMSG(reader *kafka.Reader, msg kafka.Message) {
 	}
 }
 
-func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:   cfg.Brokers,
-		Topic:     cfg.Topic,
-		Partition: 0,
-		MinBytes:  cfg.MinBytes,
-		MaxBytes:  cfg.MaxBytes,
-		GroupID:   cfg.GroupID,
-	})
-	defer reader.Close()
+func (or *OrderReader) listenMessage() {
 
+}
+
+func (or *OrderReader) ListenMessages() {
 	zap.L().Info("start listening kafka messages")
 
 	for {
-		msg, err := reader.ReadMessage(context.Background())
-		if err != nil {
+		msg, err := or.reader.ReadMessage(context.Background())
+		if errors.Is(err, io.EOF) {
+			return
+		} else if err != nil {
 			zap.L().Error("on reading new kafka message")
 			continue
 		}
 
 		orderUID := string(msg.Key)
 
-		_, err = str.FindOrder(orderUID)
+		_, err = or.str.FindOrder(orderUID)
 		if err == nil && !errors.Is(err, postgres.ErrNotFound) {
 			zap.L().Info("Order allready exists and try add to db again")
-			CommitMSG(reader, msg)
+			or.commitMSG(or.reader, msg)
 			continue
 		}
 
@@ -57,14 +75,12 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 		var ord order.Order
 		err = json.Unmarshal(jsonValue, &ord)
 		if err != nil {
-			zap.L().Error(
-				fmt.Sprintf("wrong json in %s topic(kafka)", cfg.Topic),
-			)
-			CommitMSG(reader, msg)
+			zap.L().Error("wrong json")
+			or.commitMSG(or.reader, msg)
 			continue
 		}
 
-		err = str.AddOrder(&ord)
+		err = or.str.AddOrder(&ord)
 		if err != nil {
 			zap.L().Error(
 				fmt.Sprintf(
@@ -78,6 +94,12 @@ func ListenMessages(str storage.Storager, cfg config.KafkaOrdersConfig) {
 			fmt.Sprintf("new order succesfully added: %s", orderUID),
 		)
 
-		CommitMSG(reader, msg)
+		or.commitMSG(or.reader, msg)
+	}
+}
+
+func (or *OrderReader) Shutdown() {
+	if err := or.reader.Close(); err != nil {
+		zap.L().Error("error on closing reader")
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 const (
@@ -41,4 +42,10 @@ func NewPostgres(cp config.PostgresConfig) *Postgres {
 	}
 
 	return &Postgres{db}
+}
+
+func (p Postgres) Shutdown() {
+	if err := p.conn.Close(); err != nil {
+		zap.L().Error(err.Error())
+	}
 }
