@@ -48,21 +48,22 @@ type KafkaOrdersConfig struct {
 	GroupID  string   `yaml:"group_id" env-default:"my-test-group-id"`
 }
 
+// if can't find config file throw panic
 func MustLoad(filePath string) *Config {
 	f, err := os.Open(filePath)
 	defer func() {
 		err := f.Close()
 		if err != nil {
-			zap.L().Error(err.Error())
+			zap.L().Panic(err.Error())
 		}
 	}()
 	if err != nil {
-		panic(err)
+		zap.L().Panic("can't find config file")
 	}
 
 	cfg := new(Config)
 	if err := cleanenv.ReadConfig(filePath, cfg); err != nil {
-		panic(err)
+		zap.L().Panic("error on reading config file")
 	}
 
 	return cfg

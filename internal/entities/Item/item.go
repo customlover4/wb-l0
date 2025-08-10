@@ -25,34 +25,23 @@ type Item struct {
 func (i *Item) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
-	// Записываем числовые поля
-	if err := binary.Write(buf, binary.LittleEndian, i.ChrtID); err != nil {
-		return nil, fmt.Errorf("failed to write ChrtID: %w", err)
+	strFields := []string{i.TrackNumber, i.RID, i.Name, i.Size, i.Brand}
+	for _, v := range strFields {
+		if err := binaryutils.WriteString(buf, v); err != nil {
+			return nil, err
+		}
 	}
 
-	// Записываем строковые поля через пакет binarystrings
-	if err := binaryutils.WriteString(buf, i.TrackNumber); err != nil {
-		return nil, err
+	if err := binary.Write(buf, binary.LittleEndian, i.ChrtID); err != nil {
+		return nil, fmt.Errorf("failed to write ChrtID: %w", err)
 	}
 
 	if err := binary.Write(buf, binary.LittleEndian, math.Float64bits(i.Price)); err != nil {
 		return nil, fmt.Errorf("failed to write Price: %w", err)
 	}
 
-	if err := binaryutils.WriteString(buf, i.RID); err != nil {
-		return nil, err
-	}
-
-	if err := binaryutils.WriteString(buf, i.Name); err != nil {
-		return nil, err
-	}
-
 	if err := binary.Write(buf, binary.LittleEndian, i.Sale); err != nil {
 		return nil, fmt.Errorf("failed to write Sale: %w", err)
-	}
-
-	if err := binaryutils.WriteString(buf, i.Size); err != nil {
-		return nil, err
 	}
 
 	if err := binary.Write(buf, binary.LittleEndian, math.Float64bits(i.TotalPrice)); err != nil {
@@ -61,10 +50,6 @@ func (i *Item) MarshalBinary() ([]byte, error) {
 
 	if err := binary.Write(buf, binary.LittleEndian, i.NMID); err != nil {
 		return nil, fmt.Errorf("failed to write NMID: %w", err)
-	}
-
-	if err := binaryutils.WriteString(buf, i.Brand); err != nil {
-		return nil, err
 	}
 
 	if err := binary.Write(buf, binary.LittleEndian, i.Status); err != nil {
@@ -77,14 +62,17 @@ func (i *Item) MarshalBinary() ([]byte, error) {
 func (i *Item) UnmarshalBinary(data []byte) error {
 	r := bytes.NewReader(data)
 
-	if err := binary.Read(r, binary.LittleEndian, &i.ChrtID); err != nil {
-		return fmt.Errorf("failed to read ChrtID: %w", err)
+	strFields := []*string{&i.TrackNumber, &i.RID, &i.Name, &i.Size, &i.Brand}
+	for _, v := range strFields {
+		str, err := binaryutils.ReadString(r)
+		if err != nil {
+			return err
+		}
+		*v = str
 	}
 
-	var err error
-	i.TrackNumber, err = binaryutils.ReadString(r)
-	if err != nil {
-		return err
+	if err := binary.Read(r, binary.LittleEndian, &i.ChrtID); err != nil {
+		return fmt.Errorf("failed to read ChrtID: %w", err)
 	}
 
 	var priceBits uint64
@@ -93,23 +81,8 @@ func (i *Item) UnmarshalBinary(data []byte) error {
 	}
 	i.Price = math.Float64frombits(priceBits)
 
-	i.RID, err = binaryutils.ReadString(r)
-	if err != nil {
-		return err
-	}
-
-	i.Name, err = binaryutils.ReadString(r)
-	if err != nil {
-		return err
-	}
-
 	if err := binary.Read(r, binary.LittleEndian, &i.Sale); err != nil {
 		return fmt.Errorf("failed to read Sale: %w", err)
-	}
-
-	i.Size, err = binaryutils.ReadString(r)
-	if err != nil {
-		return err
 	}
 
 	var totalPriceBits uint64
@@ -120,11 +93,6 @@ func (i *Item) UnmarshalBinary(data []byte) error {
 
 	if err := binary.Read(r, binary.LittleEndian, &i.NMID); err != nil {
 		return fmt.Errorf("failed to read NMID: %w", err)
-	}
-
-	i.Brand, err = binaryutils.ReadString(r)
-	if err != nil {
-		return err
 	}
 
 	if err := binary.Read(r, binary.LittleEndian, &i.Status); err != nil {

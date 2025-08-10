@@ -27,10 +27,10 @@ type Order struct {
 	OOFShard          string            `db:"oof_shard" json:"oof_shard"`
 }
 
-func (o *Order) GetDataForSQLString(LIDDelivery, LIDPayment int64) []any {
+func (o *Order) GetDataForSQLString(DeliveryID, PaymentID int64) []any {
 	return []any{
 		o.OrderUID, o.TrackNumber, o.Entry,
-		LIDDelivery, LIDPayment, o.Locale, o.InternalSignature,
+		DeliveryID, PaymentID, o.Locale, o.InternalSignature,
 		o.CustomerID, o.DeliveryService, o.ShardKey, o.SMID,
 		o.DateCreated, o.OOFShard,
 	}
@@ -44,22 +44,21 @@ func (o *Order) GetDataForSQLStringOrdersItems(orderID int64) []any {
 	return res
 }
 
-type Test struct {
-	OrderUID string
-	Locale   string
-}
-
 func (o *Order) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
-	if err := binaryutils.WriteString(buf, o.OrderUID); err != nil {
-		return nil, err
+	strFields := []string{
+		o.OrderUID, o.TrackNumber, o.Entry, o.Locale, o.InternalSignature,
+		o.CustomerID, o.DeliveryService, o.ShardKey, o.DateCreated, o.OOFShard,
 	}
-	if err := binaryutils.WriteString(buf, o.TrackNumber); err != nil {
-		return nil, err
+	for _, v := range strFields {
+		if err := binaryutils.WriteString(buf, v); err != nil {
+			return nil, err
+		}
 	}
-	if err := binaryutils.WriteString(buf, o.Entry); err != nil {
-		return nil, err
+
+	if err := binary.Write(buf, binary.LittleEndian, o.SMID); err != nil {
+		return nil, fmt.Errorf("SMID: %w", err)
 	}
 
 	deliveryData, err := o.Delivery.MarshalBinary()
@@ -91,33 +90,6 @@ func (o *Order) MarshalBinary() ([]byte, error) {
 		}
 	}
 
-	if err := binaryutils.WriteString(buf, o.Locale); err != nil {
-		return nil, err
-	}
-	if err := binaryutils.WriteString(buf, o.InternalSignature); err != nil {
-		return nil, err
-	}
-	if err := binaryutils.WriteString(buf, o.CustomerID); err != nil {
-		return nil, err
-	}
-	if err := binaryutils.WriteString(buf, o.DeliveryService); err != nil {
-		return nil, err
-	}
-	if err := binaryutils.WriteString(buf, o.ShardKey); err != nil {
-		return nil, err
-	}
-
-	if err := binary.Write(buf, binary.LittleEndian, o.SMID); err != nil {
-		return nil, fmt.Errorf("SMID: %w", err)
-	}
-
-	if err := binaryutils.WriteString(buf, o.DateCreated); err != nil {
-		return nil, err
-	}
-	if err := binaryutils.WriteString(buf, o.OOFShard); err != nil {
-		return nil, err
-	}
-
 	return buf.Bytes(), nil
 }
 
@@ -125,14 +97,20 @@ func (o *Order) UnmarshalBinary(data []byte) error {
 	r := bytes.NewReader(data)
 	var err error
 
-	if o.OrderUID, err = binaryutils.ReadString(r); err != nil {
-		return err
+	strFields := []*string{
+		&o.OrderUID, &o.TrackNumber, &o.Entry, &o.Locale, &o.InternalSignature,
+		&o.CustomerID, &o.DeliveryService, &o.ShardKey, &o.DateCreated, &o.OOFShard,
 	}
-	if o.TrackNumber, err = binaryutils.ReadString(r); err != nil {
-		return err
+	for _, v := range strFields {
+		str, err := binaryutils.ReadString(r)
+		if err != nil {
+			return err
+		}
+		*v = str
 	}
-	if o.Entry, err = binaryutils.ReadString(r); err != nil {
-		return err
+
+	if err := binary.Read(r, binary.LittleEndian, &o.SMID); err != nil {
+		return fmt.Errorf("smid: %w", err)
 	}
 
 	deliveryData, err := binaryutils.ReadBytesWithLength(r)
@@ -155,7 +133,6 @@ func (o *Order) UnmarshalBinary(data []byte) error {
 	if err := binary.Read(r, binary.LittleEndian, &itemsCount); err != nil {
 		return fmt.Errorf("items count: %w", err)
 	}
-
 	o.Items = make([]item.Item, itemsCount)
 	for i := range o.Items {
 		itemData, err := binaryutils.ReadBytesWithLength(r)
@@ -165,33 +142,6 @@ func (o *Order) UnmarshalBinary(data []byte) error {
 		if err := o.Items[i].UnmarshalBinary(itemData); err != nil {
 			return fmt.Errorf("item %d: %w", i, err)
 		}
-	}
-
-	if o.Locale, err = binaryutils.ReadString(r); err != nil {
-		return err
-	}
-	if o.InternalSignature, err = binaryutils.ReadString(r); err != nil {
-		return err
-	}
-	if o.CustomerID, err = binaryutils.ReadString(r); err != nil {
-		return err
-	}
-	if o.DeliveryService, err = binaryutils.ReadString(r); err != nil {
-		return err
-	}
-	if o.ShardKey, err = binaryutils.ReadString(r); err != nil {
-		return err
-	}
-
-	if err := binary.Read(r, binary.LittleEndian, &o.SMID); err != nil {
-		return fmt.Errorf("smid: %w", err)
-	}
-
-	if o.DateCreated, err = binaryutils.ReadString(r); err != nil {
-		return err
-	}
-	if o.OOFShard, err = binaryutils.ReadString(r); err != nil {
-		return err
 	}
 
 	return nil
