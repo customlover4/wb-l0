@@ -14,8 +14,14 @@ import (
 	"go.uber.org/zap"
 )
 
-type OrderReader struct {
-	reader *kafka.Reader
+type OrderReader interface {
+	ReadMessage(context.Context) (kafka.Message, error)
+	Close() error
+	CommitMessages(context.Context, ...kafka.Message) error
+}
+
+type Service struct {
+	reader OrderReader
 }
 
 type MessageListener interface {
@@ -23,8 +29,8 @@ type MessageListener interface {
 	AddOrder(orderUID *order.Order) error
 }
 
-func NewOrderReader(cfg config.KafkaOrdersConfig) *OrderReader {
-	return &OrderReader{
+func NewOrderReader(cfg config.KafkaOrdersConfig) *Service {
+	return &Service{
 		reader: kafka.NewReader(
 			kafka.ReaderConfig{
 				Brokers:   cfg.Brokers,
@@ -38,16 +44,7 @@ func NewOrderReader(cfg config.KafkaOrdersConfig) *OrderReader {
 	}
 }
 
-func (or *OrderReader) commitMSG(reader *kafka.Reader, msg kafka.Message) {
-	err := reader.CommitMessages(context.Background(), msg)
-	if err != nil {
-		zap.L().Error(
-			fmt.Sprintf("wrong on commititing msg %s", err.Error()),
-		)
-	}
-}
-
-func (or *OrderReader) ListenMessages(str MessageListener) {
+func (or *Service) ListenMessages(str MessageListener) {
 	zap.L().Info("start listening kafka messages")
 
 	for {
@@ -59,45 +56,65 @@ func (or *OrderReader) ListenMessages(str MessageListener) {
 			continue
 		}
 
-		orderUID := string(msg.Key)
-
-		_, err = str.FindOrder(orderUID)
-		if err == nil && !errors.Is(err, postgres.ErrNotFound) {
-			zap.L().Info("Order allready exists and try add to db again")
-			or.commitMSG(or.reader, msg)
-			continue
-		}
-
-		jsonValue := msg.Value
-
-		var ord order.Order
-		err = json.Unmarshal(jsonValue, &ord)
-		if err != nil {
-			zap.L().Error("wrong json")
-			or.commitMSG(or.reader, msg)
-			continue
-		}
-
-		err = str.AddOrder(&ord)
-		if err != nil {
-			zap.L().Error(
-				fmt.Sprintf(
-					"error on adding to db: %s", err.Error(),
-				),
-			)
-			continue
-		}
-
-		zap.L().Info(
-			fmt.Sprintf("new order succesfully added: %s", orderUID),
-		)
-
-		or.commitMSG(or.reader, msg)
+		or.process(msg, str)
 	}
 }
 
-func (or *OrderReader) Shutdown() {
+func (or *Service) Shutdown() {
 	if err := or.reader.Close(); err != nil {
 		zap.L().Error("error on closing reader")
 	}
+}
+
+func (or *Service) commitMSG(msg kafka.Message) {
+	err := or.reader.CommitMessages(context.Background(), msg)
+	if err != nil {
+		zap.L().Error(
+			fmt.Sprintf("wrong on commititing msg %s", err.Error()),
+		)
+	}
+}
+
+var ErrAlreadyExists = errors.New("order already exists")
+var ErrWrongData = errors.New("wrong data in kafka message")
+var ErrInternalStorage = errors.New("error in storage, can't add order")
+
+func (or *Service) process(msg kafka.Message, str MessageListener) error {
+	var err error
+
+	orderUID := string(msg.Key)
+
+	_, err = str.FindOrder(orderUID)
+	if err == nil && !errors.Is(err, postgres.ErrNotFound) {
+		zap.L().Info("Order allready exists and try add to db again")
+		or.commitMSG(msg)
+		return ErrAlreadyExists
+	}
+
+	jsonValue := msg.Value
+
+	var ord order.Order
+	err = json.Unmarshal(jsonValue, &ord)
+	if err != nil {
+		zap.L().Error("wrong json")
+		or.commitMSG(msg)
+		return ErrWrongData
+	}
+
+	err = str.AddOrder(&ord)
+	if err != nil {
+		zap.L().Error(
+			fmt.Sprintf(
+				"error on adding to db: %s", err.Error(),
+			),
+		)
+		return ErrInternalStorage
+	}
+
+	zap.L().Info(
+		fmt.Sprintf("new order succesfully added: %s", orderUID),
+	)
+
+	or.commitMSG(msg)
+	return nil
 }

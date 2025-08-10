@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	order "first-task/internal/entities/Order"
+	"first-task/internal/storage"
 	"fmt"
 	"sync"
 
@@ -70,7 +71,7 @@ func (p *Postgres) Find(orderUID string) (*order.Order, error) {
 	var tmp []byte
 	err := p.conn.Get(&tmp, GetOrderJSONFromDataBase, orderUID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, storage.ErrNotFound
 	} else if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -107,7 +108,7 @@ func (p *Postgres) GetInitialData(size int) ([]*order.Order, error) {
 		}(wg, i, v)
 	}
 	wg.Wait()
-	
+
 	filteredResult := make([]*order.Order, 0, size)
 	for _, v := range result {
 		if v == nil {

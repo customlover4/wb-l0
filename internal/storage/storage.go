@@ -1,11 +1,16 @@
 package storage
 
-import order "first-task/internal/entities/Order"
+import (
+	"errors"
+	order "first-task/internal/entities/Order"
+)
 
 type Storage struct {
 	localStorage    Cacher
 	dataBaseStorage DataBaser
 }
+
+var ErrNotFound = errors.New("not found")
 
 func NewStorage(ls Cacher, dbs DataBaser) *Storage {
 	if ls == nil || dbs == nil {
