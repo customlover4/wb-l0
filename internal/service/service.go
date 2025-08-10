@@ -45,10 +45,6 @@ func (or *OrderReader) commitMSG(reader *kafka.Reader, msg kafka.Message) {
 	}
 }
 
-func (or *OrderReader) listenMessage() {
-
-}
-
 func (or *OrderReader) ListenMessages() {
 	zap.L().Info("start listening kafka messages")
 
