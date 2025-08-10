@@ -52,6 +52,9 @@ services:
     image: redis:7.2-alpine
     ports:
       - "6379:6379"
+    environment:
+      - MAXMEMORY=100MB
+      - MAXMEMORY_POLICY=volatile-ttl
 
 volumes:
   postgres_data:
