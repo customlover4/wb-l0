@@ -4,14 +4,120 @@
 
 Golang service with web-interface and API
 
-# On startup
+# Architecture
+
+```mermaid
+graph LR
+    %% Стили узлов
+    classDef app fill:#4CAF50,stroke:#388E3C,color:white,stroke-width:2px
+    classDef server fill:#2196F3,stroke:#0b7dda,color:white
+    classDef storage fill:#FF9800,stroke:#F57C00,color:white
+    classDef queue fill:#607D8B,stroke:#455A64,color:white
+    classDef db fill:#f44336,stroke:#d32f2f,color:white
+    classDef api fill:#9C27B0,stroke:#7B1FA2,color:white
+    
+    %% Узлы
+    A[Client Application]:::app
+    B[Web Server]:::server
+    C[Storage Service]:::storage
+    Q[External API]:::api
+    G[Kafka]:::queue
+    E[(Redis Cache)]:::db
+    F[(PostgreSQL DB)]:::db
+    
+ 
+    
+    subgraph "Data Layer"
+        C
+        E
+        F
+    end
+    
+    %% Четкие связи с пояснениями
+    G -->|New orders events| A
+    A -->|HTTP Requests| B
+    B -->|API Calls| Q
+    B -->|Data Operations| C
+    C -->|Read/Write| B
+    C -->|Cache Access| E
+    C -->|DB Persistence| F
+    A -->|Direct Access| C
+    
+    %% Легенда
+    subgraph Legend
+        direction TB
+        L1[Client App]:::app
+        L2[Web Server]:::server
+        L3[Data Services]:::storage
+        L4[Databases]:::db
+        L5[Event System]:::queue
+        L6[External APIs]:::api
+    end
+```
+
+# Data
+
+### Api Request Order
+
+```mermaid
+sequenceDiagram
+
+ autonumber
+    title Поиск заказа по order_uid
+
+    participant Client
+    participant API as "API Layer"
+    participant Storage as "Storage Service"
+    participant Cache as "Cache (Redis)"
+    participant Database as "Database (PostgreSQL)"
+
+    Note over Client: Запрос информации о заказе
+
+    Client->>API: GET /order/{order_uid}
+    API->>Storage: FindOrder(order_uid)
+
+    rect rgb(240,240,255)
+        Note right of Storage: Поиск в кеше
+        Storage->>Cache: Find(order_uid)
+        
+        alt Найдено в кеше
+            Cache-->>Storage: order.Order object
+            Storage-->>API: order.Order object
+            API-->>Client: 200 OK (with data, json)
+        else Не найдено в кеше
+            rect rgb(255,240,240)
+                Note right of Storage: Поиск в БД
+                Storage->>DB: Find(order_uid)
+                
+                alt Найдено в БД
+                    DB-->>Storage: Order data
+                    Storage->>Cache: Save(order_uid, data)
+                    Storage-->>API: order.Order object
+                    API-->>Client: 200 OK (with data json)
+                else Не найдено
+                    DB-->>Storage: Error (Not Found)
+                    Storage-->>API: Error
+                    API-->>Client: 404 Not Found
+                end
+            end
+        end
+    end
+
+```
+
+# API Documentation
+
+### localhost:8080/swagger/index.html
+
+
+# Local startup
 
 - docker-compose up
 
   ```
-  postgres: localhost:5432 (user=dev, password=qqq, dbname=mydb)
-  pgadmin: localhost:8081
-  kafka: localhost:9092
+  postgres: localhost:5432 (user=dev, password=qqq, dbname=mydb) | load dump with test data
+  pgadmin: localhost:8081 (admin@example.com:admin)
+  kafka: localhost:9092 (topic=orders)
   redis: localhost:6379
   ```
 
@@ -96,5 +202,5 @@ MaxBytes  int  `yaml:"max_bytes" env-default:"10e6"`
 }
 ```
 
-- logs
+# logs
   Logs saved in ./log/app.log
