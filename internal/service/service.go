@@ -6,7 +6,7 @@ import (
 	"errors"
 	"first-task/internal/config"
 	order "first-task/internal/entities/Order"
-	"first-task/internal/storage/postgres"
+	"first-task/internal/storage"
 	"fmt"
 	"io"
 
@@ -88,7 +88,7 @@ func (or *Service) process(msg kafka.Message, str MessageListener) error {
 	orderUID := string(msg.Key)
 
 	_, err = str.FindOrder(orderUID)
-	if err == nil && !errors.Is(err, postgres.ErrNotFound) {
+	if err == nil && !errors.Is(err, storage.ErrNotFound) {
 		or.commitMSG(msg)
 		return ErrAlreadyExists
 	}
