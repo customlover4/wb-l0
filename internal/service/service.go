@@ -14,6 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
+var ErrAlreadyExists = errors.New("order already exists")
+var ErrWrongData = errors.New("wrong data in kafka message")
+var ErrInternalStorage = errors.New("error in storage, can't add order")
+
 type OrderReader interface {
 	ReadMessage(context.Context) (kafka.Message, error)
 	Close() error
@@ -56,7 +60,10 @@ func (or *Service) ListenMessages(str MessageListener) {
 			continue
 		}
 
-		or.process(msg, str)
+		err = or.process(msg, str)
+		if err != nil {
+			zap.L().Error(err.Error())
+		}
 	}
 }
 
@@ -75,10 +82,6 @@ func (or *Service) commitMSG(msg kafka.Message) {
 	}
 }
 
-var ErrAlreadyExists = errors.New("order already exists")
-var ErrWrongData = errors.New("wrong data in kafka message")
-var ErrInternalStorage = errors.New("error in storage, can't add order")
-
 func (or *Service) process(msg kafka.Message, str MessageListener) error {
 	var err error
 
@@ -86,7 +89,6 @@ func (or *Service) process(msg kafka.Message, str MessageListener) error {
 
 	_, err = str.FindOrder(orderUID)
 	if err == nil && !errors.Is(err, postgres.ErrNotFound) {
-		zap.L().Info("Order allready exists and try add to db again")
 		or.commitMSG(msg)
 		return ErrAlreadyExists
 	}
@@ -96,18 +98,12 @@ func (or *Service) process(msg kafka.Message, str MessageListener) error {
 	var ord order.Order
 	err = json.Unmarshal(jsonValue, &ord)
 	if err != nil {
-		zap.L().Error("wrong json")
 		or.commitMSG(msg)
 		return ErrWrongData
 	}
 
 	err = str.AddOrder(&ord)
 	if err != nil {
-		zap.L().Error(
-			fmt.Sprintf(
-				"error on adding to db: %s", err.Error(),
-			),
-		)
 		return ErrInternalStorage
 	}
 
