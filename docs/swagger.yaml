@@ -145,7 +145,7 @@ paths:
           description: Ошибка сервера
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
-      summary: GetOrder
+      summary: FindOrderAPI
       tags:
       - Order
 swagger: "2.0"

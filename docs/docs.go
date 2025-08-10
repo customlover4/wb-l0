@@ -25,7 +25,7 @@ const docTemplate = `{
                 "tags": [
                     "Order"
                 ],
-                "summary": "GetOrder",
+                "summary": "FindOrderAPI",
                 "parameters": [
                     {
                         "type": "string",
