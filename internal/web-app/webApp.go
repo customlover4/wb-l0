@@ -28,7 +28,7 @@ func (wa *WebApp) CreateServer(str handlers.OrderGetter, cw config.WebConfig) {
 
 	mux.HandleFunc("GET /order/{order_uid}", handlers.FindOrderAPI(str))
 	mux.HandleFunc("GET /find-order", handlers.FindOrder(str))
-	mux.HandleFunc("/", handlers.MainPage(str))
+	mux.HandleFunc("/", handlers.MainPage())
 
 	wa.server = &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", cw.Host, cw.Port),

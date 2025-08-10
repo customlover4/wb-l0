@@ -5,6 +5,7 @@ import (
 	"errors"
 	order "first-task/internal/entities/Order"
 	"first-task/internal/storage"
+	"first-task/internal/templates"
 	"fmt"
 	"net/http"
 	"text/template"
@@ -25,18 +26,18 @@ var StatusNotFound = "not found"
 var StatusBadRequest = "bad request"
 var StatusInternalServerError = "internal server error"
 
-func MainPage(str OrderGetter) http.HandlerFunc {
+var tpl = template.Must(templates.LoadTemplates())
+
+func MainPage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "internal.web-app.handlers.HandleMainPage"
 
-		tmpl, err := template.ParseFiles("templates/main.html")
+		err := tpl.ExecuteTemplate(w, "main.html", nil)
 		if err != nil {
 			zap.L().Error(fmt.Sprintf("%s: %s", op, err.Error()))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
-		tmpl.Execute(w, nil)
 	}
 }
 
