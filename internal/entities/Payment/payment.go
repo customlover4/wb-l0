@@ -9,7 +9,6 @@ import (
 )
 
 type Payment struct {
-	Id           int64   `db:"id" json:"id"`
 	Transaction  string  `db:"transaction" json:"transaction"`
 	RequestID    string  `db:"request_id" json:"request_id"`
 	Currency     string  `db:"currency" json:"currency"`
@@ -33,10 +32,6 @@ func (p *Payment) GetDataForSQLString() []any {
 
 func (p *Payment) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
-
-	if err := binary.Write(buf, binary.LittleEndian, p.Id); err != nil {
-		return nil, fmt.Errorf("failed to write Id: %w", err)
-	}
 
 	stringFields := []string{
 		p.Transaction,
@@ -72,10 +67,6 @@ func (p *Payment) MarshalBinary() ([]byte, error) {
 
 func (p *Payment) UnmarshalBinary(data []byte) error {
 	r := bytes.NewReader(data)
-
-	if err := binary.Read(r, binary.LittleEndian, &p.Id); err != nil {
-		return fmt.Errorf("failed to read Id: %w", err)
-	}
 
 	stringFields := []*string{
 		&p.Transaction,

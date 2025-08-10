@@ -8,7 +8,7 @@ import (
 )
 
 type Delivery struct {
-	Id      int64  `db:"id" json:"id"`
+	Id      int64  `db:"id" json:"-"`
 	Name    string `db:"name" json:"name"`
 	Phone   string `db:"phone" json:"phone"`
 	Zip     string `db:"zip" json:"zip"`
