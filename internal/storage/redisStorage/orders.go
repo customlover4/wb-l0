@@ -24,14 +24,13 @@ func (rs RedisStorage) Add(ord *order.Order) {
 func (rs RedisStorage) Find(orderUID string) *order.Order {
 	res := rs.rdb.Get(context.Background(), orderUID)
 	if res.Err() != nil {
-		zap.L().Error("on finding value in redis storage")
 		return nil
 	}
 
 	var resultData order.Order
 	err := res.Scan(&resultData)
 	if err != nil {
-		zap.L().Error("on finding value in redis storage")
+		zap.L().Error("on scanning value from redis storage")
 		return nil
 	}
 

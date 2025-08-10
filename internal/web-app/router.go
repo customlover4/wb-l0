@@ -4,6 +4,8 @@ import (
 	"first-task/internal/storage"
 	"first-task/internal/web-app/handlers"
 	"net/http"
+
+	httpSwager "github.com/swaggo/http-swagger"
 )
 
 func Handle(str storage.Storager) http.Handler {
@@ -11,9 +13,12 @@ func Handle(str storage.Storager) http.Handler {
 
 	h := handlers.NewHandler(str)
 
+	// swagger
+	mux.HandleFunc("/swagger/", httpSwager.WrapHandler)
+
+	mux.HandleFunc("GET /order/{order_uid}", h.GetOrder)
+	mux.HandleFunc("GET /find-order", h.HandleFindOrder)
 	mux.HandleFunc("/", h.HandleMainPage)
-	mux.HandleFunc("/order/{order_uid}", h.HandleOrderPage)
-	mux.HandleFunc("/find-order", h.HandleFindOrder)
 
 	return mux
 }

@@ -14,8 +14,18 @@ import (
 	"syscall"
 	"time"
 
+	_ "first-task/docs"
+
 	"go.uber.org/zap"
 )
+
+// @title Orders API
+// @version 1.0
+// @description This is simple service for parsing orders
+// @termsOfService http://swagger.io/terms/
+
+// @host localhost:8080
+// @BasePath /
 
 func main() {
 	configFile := flag.String("c", "./config.yml", ".yml config file")
@@ -51,5 +61,5 @@ func main() {
 	str.Shutdown()
 	zap.L().Info("storage is stopped")
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 1)
 }
