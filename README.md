@@ -15,44 +15,44 @@ graph LR
     classDef queue fill:#607D8B,stroke:#455A64,color:white
     classDef db fill:#f44336,stroke:#d32f2f,color:white
     classDef api fill:#9C27B0,stroke:#7B1FA2,color:white
+    classDef internal fill:#0ABAB5,stroke:#7B1FA2,color:white
     
     %% Узлы
-    A[Client Application]:::app
-    B[Web Server]:::server
-    C[Storage Service]:::storage
-    Q[External API]:::api
+    A[Client]:::app
+    B[Web App]:::internal
+    C[Storage]:::internal
+    L[Service]:::internal
+    Q[API]:::api
+    W[Pages]:::api
     G[Kafka]:::queue
-    E[(Redis Cache)]:::db
-    F[(PostgreSQL DB)]:::db
+    E[(Redis)]:::db
+    F[(PostgreSQL)]:::db
     
  
     
     subgraph "Data Layer"
-        C
         E
         F
     end
+
+    subgraph "HTTP Layer"
+        Q
+        W
+    end
+
+    subgraph "Service Layer"
+        G
+    end
     
     %% Четкие связи с пояснениями
-    G -->|New orders events| A
-    A -->|HTTP Requests| B
+    A -->|Get new orders| L
+    L -->|Read new orders| G
+    A -->|Listen And Serve| B
     B -->|API Calls| Q
-    B -->|Data Operations| C
-    C -->|Read/Write| B
+    B -->|Browser Calls| W
     C -->|Cache Access| E
     C -->|DB Persistence| F
-    A -->|Direct Access| C
-    
-    %% Легенда
-    subgraph Legend
-        direction TB
-        L1[Client App]:::app
-        L2[Web Server]:::server
-        L3[Data Services]:::storage
-        L4[Databases]:::db
-        L5[Event System]:::queue
-        L6[External APIs]:::api
-    end
+    A -->|Get saved orders| C
 ```
 
 # Data
