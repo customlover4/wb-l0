@@ -48,3 +48,8 @@ func (s *Storage) FindOrder(orderUID string) (*order.Order, error) {
 
 	return result, nil
 }
+
+func (s Storage) Shutdown() {
+	s.localStorage.Shutdown()
+	s.dataBaseStorage.Shutdown()
+}

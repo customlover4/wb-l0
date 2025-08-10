@@ -4,28 +4,37 @@ import (
 	"context"
 	"errors"
 	"first-task/internal/config"
-	"first-task/internal/storage"
 	"first-task/internal/web-app/handlers"
 	"fmt"
 	"net/http"
 
+	httpSwager "github.com/swaggo/http-swagger"
 	"go.uber.org/zap"
 )
 
 type WebApp struct {
 	server *http.Server
-	h      handlers.Handler
 }
 
-func NewWebApp(str storage.Storager, cw config.WebConfig) *WebApp {
-	return &WebApp{
-		server: &http.Server{
-			Addr:         fmt.Sprintf("%s:%s", cw.Host, cw.Port),
-			Handler:      Handle(str),
-			ReadTimeout:  cw.ReadTimeout,
-			WriteTimeout: cw.WriteTimeout,
-		},
-		h: *handlers.NewHandler(str),
+func NewWebApp() *WebApp {
+	return &WebApp{}
+}
+
+func (wa *WebApp) CreateServer(str handlers.OrderGetter, cw config.WebConfig) {
+	mux := http.NewServeMux()
+
+	// swagger
+	mux.HandleFunc("/swagger/", httpSwager.WrapHandler)
+
+	mux.HandleFunc("GET /order/{order_uid}", handlers.FindOrderAPI(str))
+	mux.HandleFunc("GET /find-order", handlers.FindOrder(str))
+	mux.HandleFunc("/", handlers.MainPage(str))
+
+	wa.server = &http.Server{
+		Addr:         fmt.Sprintf("%s:%s", cw.Host, cw.Port),
+		Handler:      mux,
+		ReadTimeout:  cw.ReadTimeout,
+		WriteTimeout: cw.WriteTimeout,
 	}
 }
 
@@ -36,7 +45,7 @@ func (wa *WebApp) StartServer() {
 	}
 }
 
-func (wa *WebApp) StopServer() {
+func (wa *WebApp) Shutdown() {
 	if err := wa.server.Shutdown(context.Background()); err != nil {
 		zap.L().Error("Error on shutdown server(http): " + err.Error())
 	}

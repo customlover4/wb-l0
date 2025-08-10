@@ -1,4 +1,4 @@
-package kafkalistener
+package service
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"errors"
 	"first-task/internal/config"
 	order "first-task/internal/entities/Order"
-	"first-task/internal/storage"
 	"first-task/internal/storage/postgres"
 	"fmt"
 	"io"
@@ -17,10 +16,14 @@ import (
 
 type OrderReader struct {
 	reader *kafka.Reader
-	str    storage.Storager
 }
 
-func NewOrderReader(str storage.Storager, cfg config.KafkaOrdersConfig) *OrderReader {
+type MessageListener interface {
+	FindOrder(orderUID string) (*order.Order, error)
+	AddOrder(orderUID *order.Order) error
+}
+
+func NewOrderReader(cfg config.KafkaOrdersConfig) *OrderReader {
 	return &OrderReader{
 		reader: kafka.NewReader(
 			kafka.ReaderConfig{
@@ -32,7 +35,6 @@ func NewOrderReader(str storage.Storager, cfg config.KafkaOrdersConfig) *OrderRe
 				GroupID:   cfg.GroupID,
 			},
 		),
-		str: str,
 	}
 }
 
@@ -45,7 +47,7 @@ func (or *OrderReader) commitMSG(reader *kafka.Reader, msg kafka.Message) {
 	}
 }
 
-func (or *OrderReader) ListenMessages() {
+func (or *OrderReader) ListenMessages(str MessageListener) {
 	zap.L().Info("start listening kafka messages")
 
 	for {
@@ -59,7 +61,7 @@ func (or *OrderReader) ListenMessages() {
 
 		orderUID := string(msg.Key)
 
-		_, err = or.str.FindOrder(orderUID)
+		_, err = str.FindOrder(orderUID)
 		if err == nil && !errors.Is(err, postgres.ErrNotFound) {
 			zap.L().Info("Order allready exists and try add to db again")
 			or.commitMSG(or.reader, msg)
@@ -76,7 +78,7 @@ func (or *OrderReader) ListenMessages() {
 			continue
 		}
 
-		err = or.str.AddOrder(&ord)
+		err = str.AddOrder(&ord)
 		if err != nil {
 			zap.L().Error(
 				fmt.Sprintf(

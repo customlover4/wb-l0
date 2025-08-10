@@ -3,7 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"first-task/internal/storage"
+	order "first-task/internal/entities/Order"
 	"first-task/internal/storage/postgres"
 	"fmt"
 	"net/http"
@@ -12,12 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
-type Handler struct {
-	str storage.Storager
-}
-
-func NewHandler(str storage.Storager) *Handler {
-	return &Handler{str}
+type OrderGetter interface {
+	FindOrder(orderUID string) (*order.Order, error)
 }
 
 type ErrorResponse struct {
@@ -29,40 +25,44 @@ var StatusNotFound = "not found"
 var StatusBadRequest = "bad request"
 var StatusInternalServerError = "internal server error"
 
-func (h *Handler) HandleMainPage(w http.ResponseWriter, r *http.Request) {
-	const op = "internal.web-app.handlers.HandleMainPage"
+func MainPage(str OrderGetter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "internal.web-app.handlers.HandleMainPage"
 
-	tmpl, err := template.ParseFiles("templates/main.html")
-	if err != nil {
-		zap.L().Error(fmt.Sprintf("%s: %s", op, err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		tmpl, err := template.ParseFiles("templates/main.html")
+		if err != nil {
+			zap.L().Error(fmt.Sprintf("%s: %s", op, err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		tmpl.Execute(w, nil)
 	}
-
-	tmpl.Execute(w, nil)
 }
 
-func (h *Handler) HandleFindOrder(w http.ResponseWriter, r *http.Request) {
-	const op = "internal.web-app.handlers.HandleFindOrder"
-	r.ParseForm()
-	orderUID := r.FormValue("order_uid")
+func FindOrder(str OrderGetter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "internal.web-app.handlers.HandleFindOrder"
+		r.ParseForm()
+		orderUID := r.FormValue("order_uid")
 
-	ord, err := h.str.FindOrder(orderUID)
-	if errors.Is(err, postgres.ErrNotFound) {
-		NotFoundOrderTmpl(w)
-		return
-	} else if err != nil {
-		zap.L().Error(fmt.Sprintf("%s: %s", op, err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		ord, err := str.FindOrder(orderUID)
+		if errors.Is(err, postgres.ErrNotFound) {
+			NotFoundOrderTmpl(w)
+			return
+		} else if err != nil {
+			zap.L().Error(fmt.Sprintf("%s: %s", op, err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		FoundOrderTmpl(w, ord)
 	}
-
-	FoundOrderTmpl(w, ord)
 }
 
 // API
 
-// @Summary GetOrder
+// @Summary FindOrderAPI
 // @Tags Order
 // @Description get order
 // @Produce json
@@ -72,38 +72,41 @@ func (h *Handler) HandleFindOrder(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} ErrorResponse "Плохой запрос"
 // @Failure 500 {object} ErrorResponse "Ошибка сервера"
 // @Router /order/{order_uid} [get]
-func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
-	const op = "internal.web-app.handlers.HandleOrderPage"
+func FindOrderAPI(str OrderGetter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "internal.web-app.handlers.HandleOrderPage"
 
-	w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json")
 
-	orderUID := r.PathValue("order_uid")
-	if orderUID == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{
-			Status: StatusBadRequest,
-			Code:   http.StatusBadRequest,
-		})
-		return
+		orderUID := r.PathValue("order_uid")
+		if orderUID == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(ErrorResponse{
+				Status: StatusBadRequest,
+				Code:   http.StatusBadRequest,
+			})
+			return
+		}
+		ord, err := str.FindOrder(orderUID)
+		if errors.Is(err, postgres.ErrNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(ErrorResponse{
+				Status: StatusNotFound,
+				Code:   http.StatusNotFound,
+			})
+			return
+		} else if err != nil {
+			zap.L().Error(fmt.Sprintf("%s: %s", op, err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ErrorResponse{
+				Status: StatusInternalServerError,
+				Code:   http.StatusInternalServerError,
+			})
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(ord)
 	}
-	ord, err := h.str.FindOrder(orderUID)
-	if errors.Is(err, postgres.ErrNotFound) {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(ErrorResponse{
-			Status: StatusNotFound,
-			Code:   http.StatusNotFound,
-		})
-		return
-	} else if err != nil {
-		zap.L().Error(fmt.Sprintf("%s: %s", op, err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{
-			Status: StatusInternalServerError,
-			Code:   http.StatusInternalServerError,
-		})
-		return
-	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(ord)
 }
