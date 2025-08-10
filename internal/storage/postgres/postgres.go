@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"errors"
 	"first-task/internal/config"
 	"fmt"
 
@@ -15,10 +14,6 @@ const (
 	ItemsTable        = "items"
 	OrdersTable       = "orders"
 	OrdersItemsTable  = "orders_items"
-)
-
-var (
-	ErrNotFound = errors.New("can't find this order or wrong order_uid")
 )
 
 type Postgres struct {

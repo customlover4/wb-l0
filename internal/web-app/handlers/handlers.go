@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	order "first-task/internal/entities/Order"
-	"first-task/internal/storage/postgres"
+	"first-task/internal/storage"
 	"fmt"
 	"net/http"
 	"text/template"
@@ -47,7 +47,7 @@ func FindOrder(str OrderGetter) http.HandlerFunc {
 		orderUID := r.FormValue("order_uid")
 
 		ord, err := str.FindOrder(orderUID)
-		if errors.Is(err, postgres.ErrNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			NotFoundOrderTmpl(w)
 			return
 		} else if err != nil {
@@ -88,7 +88,7 @@ func FindOrderAPI(str OrderGetter) http.HandlerFunc {
 			return
 		}
 		ord, err := str.FindOrder(orderUID)
-		if errors.Is(err, postgres.ErrNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			json.NewEncoder(w).Encode(ErrorResponse{
 				Status: StatusNotFound,
