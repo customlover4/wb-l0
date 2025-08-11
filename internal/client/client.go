@@ -46,9 +46,7 @@ type WebApper interface {
 	Shutdown()
 }
 
-func NewClient(cfgPath string) *Client {
-	cfg := config.MustLoad(cfgPath)
-
+func NewClient(cfg *config.Config) *Client {
 	out := make(chan *order.Order)
 
 	str := storage.NewStorage(

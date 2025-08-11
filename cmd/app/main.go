@@ -2,6 +2,7 @@ package main
 
 import (
 	"first-task/internal/client"
+	"first-task/internal/config"
 	"first-task/pkg/logger"
 	"flag"
 	"os"
@@ -28,7 +29,9 @@ func main() {
 
 	zap.ReplaceGlobals(logger.SetupLogger())
 
-	c := client.NewClient(*configFile)
+	cfg := config.MustLoad(*configFile)
+
+	c := client.NewClient(cfg)
 
 	c.Init()
 
