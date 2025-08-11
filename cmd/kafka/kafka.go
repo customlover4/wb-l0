@@ -114,7 +114,7 @@ func main() {
 		panic(err)
 	}
 	defer conn.Close()
-	topic := "orders"
+	topic := "orders_new"
 	topicConfig := kafka.TopicConfig{
 		Topic:             topic,
 		NumPartitions:     3,
@@ -131,7 +131,7 @@ func main() {
 	})
 	defer writer.Close()
 
-	for range time.NewTicker(time.Second * 20).C {
+	for range time.NewTicker(time.Second * 1).C {
 		ord := NewTESTOrder(GenerateRandomString(30))
 
 		kafkaValue, err := json.MarshalIndent(ord, " ", "  ")
@@ -147,6 +147,8 @@ func main() {
 				Value: kafkaValue,
 			},
 		)
+
+		zap.L().Info("send new message")
 
 		if err != nil {
 			zap.L().Error("Error on writing new order to kafka")
