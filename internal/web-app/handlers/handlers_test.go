@@ -158,7 +158,7 @@ func TestOrderAPI(t *testing.T) {
 
 	r := http.NewServeMux()
 	r.HandleFunc("/order/{order_uid}", FindOrderAPI(&StorageMock{}))
-
+	
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 
