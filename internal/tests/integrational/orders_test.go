@@ -33,6 +33,8 @@ func mockOrderToKafka(t *testing.T, brokerAddr string) string {
 	err = conn.CreateTopics(topicConfig)
 	require.NoError(t, err)
 
+	time.Sleep(time.Second * 5)
+
 	writer := kafka.NewWriter(kafka.WriterConfig{
 		Brokers: []string{brokerAddr},
 		Topic:   KafkaTopic,
@@ -108,6 +110,7 @@ func TestNewOrder(t *testing.T) {
 					Topic:    KafkaTopic,
 					MinBytes: 1,
 					MaxBytes: 10e6,
+					GroupID: "my-test-group",
 				},
 			},
 		)

@@ -115,7 +115,7 @@ func main() {
 		panic(err)
 	}
 	defer conn.Close()
-	topic := "test_topic"
+	topic := "orders_new_event"
 	topicConfig := kafka.TopicConfig{
 		Topic:             topic,
 		NumPartitions:     3,

@@ -12,7 +12,7 @@ import (
 func FoundOrderTmpl(w http.ResponseWriter, ord *order.Order) {
 	const op = "internal.web-app.handlers.FoundOrderTmpl"
 	buf := bytes.NewBuffer([]byte{})
-	err := tpl.ExecuteTemplate(buf, "order.html", nil)
+	err := tpl.ExecuteTemplate(buf, "order.html", ord)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("%s: %s", op, err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)

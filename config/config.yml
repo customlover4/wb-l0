@@ -21,9 +21,10 @@ redis:
 kafka:
   brokers:
     - "localhost:9092"
-  topic: "orders_new"
+  topic: "orders_new_event"
   partition: 0
   min_bytes: 1
   max_bytes: 10e6
+  group_id: "my-group-id"
 
 initial_data_size: 100
