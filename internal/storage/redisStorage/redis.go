@@ -19,8 +19,8 @@ type RedisStorage struct {
 	rdb *redis.Client
 }
 
-func NewRedisStorage(cfg config.RedisConfig) RedisStorage {
-	return RedisStorage{
+func NewRedisStorage(cfg config.RedisConfig) *RedisStorage {
+	return &RedisStorage{
 		redis.NewClient(&redis.Options{
 			Addr:     fmt.Sprintf("%s:%s", cfg.Host, cfg.Port),
 			Password: cfg.Password,
@@ -29,7 +29,7 @@ func NewRedisStorage(cfg config.RedisConfig) RedisStorage {
 	}
 }
 
-func (rs RedisStorage) Shutdown() {
+func (rs *RedisStorage) Shutdown() {
 	if err := rs.rdb.Close(); err != nil {
 		zap.L().Error(err.Error())
 	}
