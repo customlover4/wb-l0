@@ -2,10 +2,12 @@ package integrational
 
 import (
 	"context"
+	"first-task/internal/config"
 	delivery "first-task/internal/entities/Delivery"
 	item "first-task/internal/entities/Item"
 	order "first-task/internal/entities/Order"
 	payment "first-task/internal/entities/Payment"
+	"first-task/internal/storage/redisStorage"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,8 +15,18 @@ import (
 
 func TestRedis(t *testing.T) {
 	t.Parallel()
-	redisContainer, localStorage := SetupTestRedis(t)
+	redisContainer := SetupTestRedis(t)
 	defer redisContainer.Terminate(context.Background())
+
+	host, err := redisContainer.Host(context.Background())
+	require.NoError(t, err)
+	port, err := redisContainer.MappedPort(context.Background(), RedisMapped)
+	require.NoError(t, err)
+
+	localStorage := redisStorage.NewRedisStorage(config.RedisConfig{
+		Host: host,
+		Port: port.Port(),
+	})
 	defer localStorage.Shutdown()
 
 	testOrder := &order.Order{

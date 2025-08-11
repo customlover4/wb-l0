@@ -3,9 +3,6 @@ package integrational
 import (
 	"context"
 	"database/sql"
-	"first-task/internal/config"
-	"first-task/internal/storage/postgres"
-	"first-task/internal/storage/redisStorage"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -22,19 +19,23 @@ import (
 
 const (
 	DBHost     = "localhost"
-	DBPort     = "5432"
 	DBUser     = "test"
 	DBPassword = "test"
 	DBName     = "testdb"
-	KafkaTopic = "orders"
+
+	KafkaTopic = "test_topic"
+
+	DBMapped    = "5432"
+	RedisMapped = "6379"
+	KafkaMapped = "9092"
 )
 
-func SetupTestDB(t *testing.T) (testcontainers.Container, *postgres.Postgres) {
+func SetupTestDB(t *testing.T) testcontainers.Container {
 	ctx := context.Background()
 
 	req := testcontainers.ContainerRequest{
 		Image:        "postgres:13-alpine",
-		ExposedPorts: []string{"5432/tcp"},
+		ExposedPorts: []string{fmt.Sprintf("%s/tcp", DBMapped)},
 		Env: map[string]string{
 			"POSTGRES_USER":     DBUser,
 			"POSTGRES_PASSWORD": DBPassword,
@@ -49,7 +50,7 @@ func SetupTestDB(t *testing.T) (testcontainers.Container, *postgres.Postgres) {
 	require.NoError(t, err)
 
 	host, _ := pgContainer.Host(ctx)
-	port, _ := pgContainer.MappedPort(ctx, "5432")
+	port, _ := pgContainer.MappedPort(ctx, DBMapped)
 	connStr := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		host, port.Port(), DBUser, DBPassword, DBName,
@@ -66,16 +67,7 @@ func SetupTestDB(t *testing.T) (testcontainers.Container, *postgres.Postgres) {
 
 	applyMigrations(t, oldDB)
 
-	pg := postgres.NewPostgres(config.PostgresConfig{
-		Host:     host,
-		Port:     port.Port(),
-		User:     DBUser,
-		Password: DBPassword,
-		DBName:   DBName,
-		SSLMode:  false,
-	})
-
-	return pgContainer, pg
+	return pgContainer
 }
 
 func applyMigrations(t *testing.T, db *sql.DB) {
@@ -103,11 +95,11 @@ values(
 );
 `
 
-func SetupTestRedis(t *testing.T) (testcontainers.Container, *redisStorage.RedisStorage) {
+func SetupTestRedis(t *testing.T) testcontainers.Container {
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
 		Image:        "redis:7.2-alpine",
-		ExposedPorts: []string{"6379/tcp"},
+		ExposedPorts: []string{fmt.Sprintf("%s/tcp", RedisMapped)},
 		Env: map[string]string{
 			"MAXMEMORY":        "100MB",
 			"MAXMEMORY_POLICY": "volatile-ttl",
@@ -122,40 +114,35 @@ func SetupTestRedis(t *testing.T) (testcontainers.Container, *redisStorage.Redis
 
 	time.Sleep(time.Second * 3)
 
-	host, err := redisContainer.Host(ctx)
-	require.NoError(t, err)
-	port, err := redisContainer.MappedPort(ctx, "6379")
-	require.NoError(t, err)
-
-	str := redisStorage.NewRedisStorage(config.RedisConfig{
-		Host: host,
-		Port: port.Port(),
-	})
-
-	return redisContainer, str
+	return redisContainer
 }
 
 func SetupTestKafka(t *testing.T) testcontainers.Container {
 	ctx := context.Background()
 	req := testcontainers.ContainerRequest{
-		Image:        "bitnami/kafka:4.0.0",
-		ExposedPorts: []string{"9092/tcp"},
+		Image:           "bitnami/kafka:4.0.0",
+		HostAccessPorts: []int{9092},
+		ExposedPorts:    []string{"9092/tcp"},
 		Env: map[string]string{
-			"KAFKA_CFG_NODE_ID":                        "1",
-			"KAFKA_CFG_PROCESS_ROLES":                  "controller,broker",
-			"KAFKA_CFG_LISTENERS":                      "PLAINTEXT://:9092,CONTROLLER://:9093",
+			"KAFKA_CFG_NODE_ID":       "1",
+			"KAFKA_CFG_PROCESS_ROLES": "controller,broker",
+			"KAFKA_CFG_LISTENERS": fmt.Sprintf(
+				"PLAINTEXT://:%s,CONTROLLER://:9093", KafkaMapped,
+			),
 			"KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP": "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
-			"KAFKA_CFG_ADVERTISED_LISTENERS":           "PLAINTEXT://localhost:9092",
-			"KAFKA_CFG_CONTROLLER_QUORUM_VOTERS":       "1@localhost:9093",
-			"KAFKA_CFG_CONTROLLER_LISTENER_NAMES":      "CONTROLLER",
-			"KAFKA_CFG_INTER_BROKER_LISTENER_NAME":     "PLAINTEXT",
+			"KAFKA_CFG_ADVERTISED_LISTENERS": fmt.Sprintf(
+				"PLAINTEXT://localhost:%s", KafkaMapped,
+			),
+			"KAFKA_CFG_CONTROLLER_QUORUM_VOTERS":   "1@localhost:9093",
+			"KAFKA_CFG_CONTROLLER_LISTENER_NAMES":  "CONTROLLER",
+			"KAFKA_CFG_INTER_BROKER_LISTENER_NAME": "PLAINTEXT",
 		},
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.PortBindings = nat.PortMap{
 				"9092/tcp": []nat.PortBinding{
 					{
-						HostIP:   "0.0.0.0", // Слушаем на всех интерфейсах
-						HostPort: "9092",    // Фиксируем порт хоста
+						HostIP:   "0.0.0.0",   // Слушаем на всех интерфейсах
+						HostPort: KafkaMapped, // Фиксируем порт хоста
 					},
 				},
 			}

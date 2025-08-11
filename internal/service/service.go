@@ -40,12 +40,11 @@ func NewOrderReader(c chan *order.Order, cfg config.KafkaOrdersConfig) *Service 
 
 		reader: kafka.NewReader(
 			kafka.ReaderConfig{
-				Brokers:   cfg.Brokers,
-				Topic:     cfg.Topic,
+				Brokers: cfg.Brokers,
+				Topic:   cfg.Topic,
 				Partition: 0,
-				MinBytes:  cfg.MinBytes,
-				MaxBytes:  cfg.MaxBytes,
-				GroupID:   cfg.GroupID,
+				MinBytes: cfg.MinBytes,
+				MaxBytes: cfg.MaxBytes,
 			},
 		),
 	}

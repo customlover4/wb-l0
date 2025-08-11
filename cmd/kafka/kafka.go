@@ -7,6 +7,7 @@ import (
 	item "first-task/internal/entities/Item"
 	order "first-task/internal/entities/Order"
 	payment "first-task/internal/entities/Payment"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -114,7 +115,7 @@ func main() {
 		panic(err)
 	}
 	defer conn.Close()
-	topic := "orders_new"
+	topic := "test_topic"
 	topicConfig := kafka.TopicConfig{
 		Topic:             topic,
 		NumPartitions:     3,
@@ -148,10 +149,11 @@ func main() {
 			},
 		)
 
-		zap.L().Info("send new message")
-
 		if err != nil {
-			zap.L().Error("Error on writing new order to kafka")
+			fmt.Println("Error on writing new order to kafka " + err.Error())
+			continue
 		}
+
+		fmt.Println("send new message")
 	}
 }

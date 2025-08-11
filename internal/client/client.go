@@ -67,13 +67,13 @@ func NewClient(cfg *config.Config) *Client {
 func (c *Client) Init() {
 	c.str.LoadInitialData(c.cfg.InitialDataSize)
 
-	go c.ListenMessages()
+	go c.listenMessages()
 
 	c.wa.CreateServer(c.str, c.cfg.WebConfig)
 	go c.wa.StartServer()
 }
 
-func (c *Client) ListenMessages() {
+func (c *Client) listenMessages() {
 	ctx, finish := context.WithCancel(context.Background())
 	defer finish()
 

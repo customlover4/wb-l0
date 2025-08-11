@@ -45,7 +45,6 @@ type KafkaOrdersConfig struct {
 	Topic    string   `yaml:"topic" env-required:"true"`
 	MinBytes int      `yaml:"min_bytes" env-default:"1"`
 	MaxBytes int      `yaml:"max_bytes" env-default:"10e6"`
-	GroupID  string   `yaml:"group_id" env-default:"my-test-group-id"`
 }
 
 // if can't find config file throw panic

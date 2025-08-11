@@ -70,7 +70,6 @@ func FindOrder(str OrderGetter) http.HandlerFunc {
 // @Param order_uid path string true "Уникальный номер заказа"
 // @Success 200 {object} order.Order "Успешный запрос"
 // @Failure 404 {object} ErrorResponse "Заказ не найден"
-// @Failure 400 {object} ErrorResponse "Плохой запрос"
 // @Failure 500 {object} ErrorResponse "Ошибка сервера"
 // @Router /order/{order_uid} [get]
 func FindOrderAPI(str OrderGetter) http.HandlerFunc {
@@ -80,14 +79,6 @@ func FindOrderAPI(str OrderGetter) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 
 		orderUID := r.PathValue("order_uid")
-		if orderUID == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(ErrorResponse{
-				Status: StatusBadRequest,
-				Code:   http.StatusBadRequest,
-			})
-			return
-		}
 		ord, err := str.FindOrder(orderUID)
 		if errors.Is(err, storage.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)

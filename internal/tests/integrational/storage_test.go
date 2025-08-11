@@ -2,10 +2,12 @@ package integrational
 
 import (
 	"context"
+	"first-task/internal/config"
 	delivery "first-task/internal/entities/Delivery"
 	item "first-task/internal/entities/Item"
 	order "first-task/internal/entities/Order"
 	payment "first-task/internal/entities/Payment"
+	"first-task/internal/storage/postgres"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,8 +15,22 @@ import (
 
 func TestPostgres(t *testing.T) {
 	t.Parallel()
-	pgContainer, str := SetupTestDB(t)
+	pgContainer := SetupTestDB(t)
 	defer pgContainer.Terminate(context.Background())
+
+	host, err := pgContainer.Host(context.Background())
+	require.NoError(t, err)
+	port, err := pgContainer.MappedPort(context.Background(), DBMapped)
+	require.NoError(t, err)
+
+	str := postgres.NewPostgres(config.PostgresConfig{
+		Host:     host,
+		Port:     port.Port(),
+		User:     DBUser,
+		Password: DBPassword,
+		DBName:   DBName,
+		SSLMode:  false,
+	})
 	defer str.Shutdown()
 
 	testOrder := &order.Order{
