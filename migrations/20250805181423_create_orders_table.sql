@@ -19,7 +19,7 @@ CREATE TABLE orders (
     delivery_service varchar(255) not null,
     shardkey text not null,
     sm_id smallint not null,
-    date_created TIMESTAMPTZ default now(),
+    date_created varchar(255) not null,
     oof_shard text not null
 );
 
