@@ -29,7 +29,7 @@ type Client struct {
 type Storager interface {
 	AddOrder(ord *order.Order) error
 	FindOrder(orderUID string) (*order.Order, error)
-	LoadInitialData(size int)
+	LoadInitialData(size int) error
 	Shutdown()
 }
 
@@ -65,8 +65,13 @@ func NewClient(cfg *config.Config) *Client {
 }
 
 func (c *Client) Init() {
-	c.str.LoadInitialData(c.cfg.InitialDataSize)
-
+	err := c.str.LoadInitialData(c.cfg.InitialDataSize)
+	if err != nil {
+		zap.L().Warn(
+			"can't load initial data, skipping this | Err: " + err.Error(),
+		)
+	}
+	
 	go c.listenMessages()
 
 	c.wa.CreateServer(c.str, c.cfg.WebConfig)

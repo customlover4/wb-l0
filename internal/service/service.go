@@ -15,9 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var ErrAlreadyExists = errors.New("order already exists")
-var ErrWrongData = errors.New("wrong data in kafka message")
-var ErrInternalStorage = errors.New("error in storage, can't add order")
+var ErrWrongData = errors.New("can't unmarshal json from kafka msg")
 
 type OrderReader interface {
 	ReadMessage(context.Context) (kafka.Message, error)
@@ -29,11 +27,6 @@ type Service struct {
 	reader   OrderReader
 	out      chan *order.Order
 	validate *validator.Validate
-}
-
-type MessageListener interface {
-	FindOrder(orderUID string) (*order.Order, error)
-	AddOrder(orderUID *order.Order) error
 }
 
 func NewOrderReader(c chan *order.Order, cfg config.KafkaOrdersConfig) *Service {
@@ -82,20 +75,21 @@ func (or *Service) ListenMessages(ctx context.Context) {
 }
 
 func (or *Service) process(ctx context.Context, msg kafka.Message) error {
-	var err error
+	const op = "internal.service.process"
+
 	jsonValue := msg.Value
 
 	var ord order.Order
-	err = json.Unmarshal(jsonValue, &ord)
+	err := json.Unmarshal(jsonValue, &ord)
 	if err != nil {
 		or.commitMSG(msg)
-		return ErrWrongData
+		return fmt.Errorf("%s: %w", op, ErrWrongData)
 	}
 
 	err = or.validate.Struct(ord)
 	if err != nil {
 		or.commitMSG(msg)
-		return errors.New("Validation failed: " + err.Error())
+		return fmt.Errorf("%s: order validation failed (%w)", op, err)
 	}
 
 	for {
@@ -112,9 +106,17 @@ func (or *Service) process(ctx context.Context, msg kafka.Message) error {
 func (or *Service) commitMSG(msg kafka.Message) {
 	err := or.reader.CommitMessages(context.Background(), msg)
 	if err != nil {
-		zap.L().Error(
-			fmt.Sprintf("wrong on commititing msg %s", err.Error()),
-		)
+		for {
+			for i := 0; i < 5; i++ {
+				err := or.reader.CommitMessages(context.Background(), msg)
+				if err == nil {
+					return
+				}
+				zap.L().Error("can't commit message(kafka): " + err.Error())
+				time.Sleep(time.Second * 10)
+			}
+			time.Sleep(time.Minute * 5)
+		}
 	}
 }
 

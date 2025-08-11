@@ -7,15 +7,19 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Storage) LoadInitialData(size int) {
+func (s *Storage) LoadInitialData(size int) error {
+	const op = "internal.storage.LoadInitialData"
+	
 	zap.L().Info("start initialization cache")
 
 	ords, err := s.dataBaseStorage.GetInitialData(size)
 	if err != nil {
-		zap.L().Error("cant load initial cache")
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	s.localStorage.LoadInitialCache(ords)
+
+	return nil
 }
 
 func (s *Storage) AddOrder(ord *order.Order) error {
