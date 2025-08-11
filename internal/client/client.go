@@ -84,35 +84,31 @@ func (c *Client) ListenMessages() {
 	for v := range c.ordersChannel {
 		err := c.str.AddOrder(v)
 		if err != nil {
+			zap.L().Warn("DB is down, trying retry: " + err.Error())
 
-			zap.L().Warn("DB is down, trying retry: " + v.OrderUID)
-
-			retryResult := c.retry(v)
-			if !retryResult {
-				finish()
-				c.backoff(v)
-				return
-			}
+			c.retry(v)
 		}
 
 		zap.L().Info(fmt.Sprintf("new order added: %s", v.OrderUID))
 	}
 }
 
-func (c *Client) retry(ord *order.Order) bool {
-	successRetry := false
-	for i := 0; i < 5; i++ {
-		err := c.str.AddOrder(ord)
-		if err == nil {
-			zap.L().Info("DB retrying success")
-			successRetry = true
-			break
+func (c *Client) retry(ord *order.Order) {
+	for {
+		for i := 0; i < 5; i++ {
+			err := c.str.AddOrder(ord)
+			if err == nil {
+				zap.L().Info("DB retrying success")
+				return
+			}
+			time.Sleep(time.Second * 5)
+			zap.L().Error(
+				"DB still down, retrying again...\n" + err.Error(),
+			)
 		}
-		time.Sleep(time.Second * 5)
-		zap.L().Info("DB still down, retrying again...")
+		zap.L().Error("So much attemps retry DB. Waiting 5 minutes and try again.")
+		time.Sleep(time.Minute * 5)
 	}
-
-	return successRetry
 }
 
 func (c *Client) backoff(ord *order.Order) {

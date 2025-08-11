@@ -8,6 +8,7 @@ import (
 	order "first-task/internal/entities/Order"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
@@ -61,12 +62,34 @@ func (or *Service) ListenMessages(ctx context.Context) {
 			if errors.Is(err, io.EOF) {
 				break
 			} else if err != nil {
-				zap.L().Error("on reading new kafka message: " + err.Error())
-				continue
+				zap.L().Error(
+					"Kafka is down, trying retry... (error: " + err.Error() + ")",
+				)
+
+				msg = or.retry()
 			}
 
 			or.process(ctx, msg)
 		}
+	}
+}
+
+func (or *Service) retry() kafka.Message {
+	for {
+		for i := 0; i < 5; i++ {
+			msg, err := or.reader.ReadMessage(context.Background())
+			if errors.Is(err, io.EOF) {
+				break
+			} else if err == nil {
+				return msg
+			}
+			time.Sleep(time.Second * 5)
+			zap.L().Error(
+				"Kafka still down, retrying again...\n" + err.Error(),
+			)
+		}
+		zap.L().Error("So much attemps retry DB. Waiting 5 minutes and try again.")
+		time.Sleep(time.Minute * 5)
 	}
 }
 
