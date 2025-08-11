@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"first-task/internal/config"
 	order "first-task/internal/entities/Order"
 	"first-task/internal/service"
@@ -14,7 +13,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
 
@@ -109,34 +107,6 @@ func (c *Client) retry(ord *order.Order) {
 		zap.L().Error("So much attemps retry DB. Waiting 5 minutes and try again.")
 		time.Sleep(time.Minute * 5)
 	}
-}
-
-func (c *Client) backoff(ord *order.Order) {
-	c.Shutdown()
-
-	writer := kafka.NewWriter(kafka.WriterConfig{
-		Brokers: c.cfg.KafkaOrdersConfig.Brokers,
-		Topic:   c.cfg.KafkaOrdersConfig.Topic,
-	})
-
-	jsonData, err := json.Marshal(ord)
-	if err != nil {
-		zap.L().Error(fmt.Sprintf(
-			"can't backoff order: %s", ord.OrderUID,
-		))
-		return
-	}
-
-	err = writer.WriteMessages(context.Background(), kafka.Message{
-		Key:   []byte(ord.OrderUID),
-		Value: jsonData,
-	})
-	if err != nil {
-		zap.L().Error("can't write backoff messages")
-		return
-	}
-
-	panic("database is down, can't save orders, data returned to kafka")
 }
 
 func (c *Client) Shutdown() {

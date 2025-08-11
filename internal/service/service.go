@@ -74,6 +74,38 @@ func (or *Service) ListenMessages(ctx context.Context) {
 	}
 }
 
+func (or *Service) process(ctx context.Context, msg kafka.Message) error {
+	var err error
+	jsonValue := msg.Value
+
+	var ord order.Order
+	err = json.Unmarshal(jsonValue, &ord)
+	if err != nil {
+		or.commitMSG(msg)
+		return ErrWrongData
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case or.out <- &ord:
+			zap.L().Info("new order succesfully get")
+			or.commitMSG(msg)
+			return nil
+		}
+	}
+}
+
+func (or *Service) commitMSG(msg kafka.Message) {
+	err := or.reader.CommitMessages(context.Background(), msg)
+	if err != nil {
+		zap.L().Error(
+			fmt.Sprintf("wrong on commititing msg %s", err.Error()),
+		)
+	}
+}
+
 func (or *Service) retry() kafka.Message {
 	for {
 		for i := 0; i < 5; i++ {
@@ -98,36 +130,4 @@ func (or *Service) Shutdown() {
 		zap.L().Error("error on closing reader")
 	}
 	close(or.out)
-}
-
-func (or *Service) commitMSG(msg kafka.Message) {
-	err := or.reader.CommitMessages(context.Background(), msg)
-	if err != nil {
-		zap.L().Error(
-			fmt.Sprintf("wrong on commititing msg %s", err.Error()),
-		)
-	}
-}
-
-func (or *Service) process(ctx context.Context, msg kafka.Message) error {
-	var err error
-	jsonValue := msg.Value
-
-	var ord order.Order
-	err = json.Unmarshal(jsonValue, &ord)
-	if err != nil {
-		or.commitMSG(msg)
-		return ErrWrongData
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case or.out <- &ord:
-			zap.L().Info("new order succesfully get")
-			or.commitMSG(msg)
-			return nil
-		}
-	}
 }
