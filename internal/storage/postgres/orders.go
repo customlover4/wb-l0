@@ -16,8 +16,8 @@ import (
 func (p *Postgres) Add(ord *order.Order) error {
 	const op = "internal.storage.postgres.AddOrder"
 
-	var lastInsertIDDelivery int64
-	var lastInsertIDPayment int64
+	var lastInsertDeliverID int64
+	var lastInsertPaymentID int64
 	var lastInsertIDOrder int64
 
 	transaction, err := p.conn.Beginx()
@@ -26,7 +26,7 @@ func (p *Postgres) Add(ord *order.Order) error {
 	}
 
 	err = sqlx.Get(
-		transaction, &lastInsertIDDelivery, GetInsertDeliverySQLString(),
+		transaction, &lastInsertDeliverID, GetInsertDeliverySQLString(),
 		ord.Delivery.GetDataForSQLString()...,
 	)
 	if err != nil {
@@ -34,7 +34,7 @@ func (p *Postgres) Add(ord *order.Order) error {
 	}
 
 	err = sqlx.Get(
-		transaction, &lastInsertIDPayment, GetInsertPaymentSQLString(),
+		transaction, &lastInsertPaymentID, GetInsertPaymentSQLString(),
 		ord.Payment.GetDataForSQLString()...,
 	)
 	if err != nil {
@@ -43,7 +43,7 @@ func (p *Postgres) Add(ord *order.Order) error {
 
 	err = sqlx.Get(
 		transaction, &lastInsertIDOrder, GetInsertOrderSQLString(),
-		ord.GetDataForSQLString(lastInsertIDDelivery, lastInsertIDPayment)...,
+		ord.GetDataForSQLString(lastInsertDeliverID, lastInsertPaymentID)...,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, HandleTxErr(transaction, err))
