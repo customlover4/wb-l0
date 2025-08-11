@@ -6,7 +6,6 @@ import (
 	"errors"
 	"first-task/internal/config"
 	order "first-task/internal/entities/Order"
-	"first-task/internal/storage"
 	"fmt"
 	"io"
 
@@ -26,6 +25,7 @@ type OrderReader interface {
 
 type Service struct {
 	reader OrderReader
+	out    chan *order.Order
 }
 
 type MessageListener interface {
@@ -33,8 +33,10 @@ type MessageListener interface {
 	AddOrder(orderUID *order.Order) error
 }
 
-func NewOrderReader(cfg config.KafkaOrdersConfig) *Service {
+func NewOrderReader(c chan *order.Order, cfg config.KafkaOrdersConfig) *Service {
 	return &Service{
+		out: c,
+
 		reader: kafka.NewReader(
 			kafka.ReaderConfig{
 				Brokers:   cfg.Brokers,
@@ -48,21 +50,22 @@ func NewOrderReader(cfg config.KafkaOrdersConfig) *Service {
 	}
 }
 
-func (or *Service) ListenMessages(str MessageListener) {
+func (or *Service) ListenMessages(ctx context.Context) {
 	zap.L().Info("start listening kafka messages")
-
 	for {
-		msg, err := or.reader.ReadMessage(context.Background())
-		if errors.Is(err, io.EOF) {
+		select {
+		case <-ctx.Done():
 			return
-		} else if err != nil {
-			zap.L().Error("on reading new kafka message")
-			continue
-		}
+		default:
+			msg, err := or.reader.ReadMessage(context.Background())
+			if errors.Is(err, io.EOF) {
+				break
+			} else if err != nil {
+				zap.L().Error("on reading new kafka message: " + err.Error())
+				continue
+			}
 
-		err = or.process(msg, str)
-		if err != nil {
-			zap.L().Error(err.Error())
+			or.process(ctx, msg)
 		}
 	}
 }
@@ -71,6 +74,7 @@ func (or *Service) Shutdown() {
 	if err := or.reader.Close(); err != nil {
 		zap.L().Error("error on closing reader")
 	}
+	close(or.out)
 }
 
 func (or *Service) commitMSG(msg kafka.Message) {
@@ -82,17 +86,8 @@ func (or *Service) commitMSG(msg kafka.Message) {
 	}
 }
 
-func (or *Service) process(msg kafka.Message, str MessageListener) error {
+func (or *Service) process(ctx context.Context, msg kafka.Message) error {
 	var err error
-
-	orderUID := string(msg.Key)
-
-	_, err = str.FindOrder(orderUID)
-	if err == nil && !errors.Is(err, storage.ErrNotFound) {
-		or.commitMSG(msg)
-		return ErrAlreadyExists
-	}
-
 	jsonValue := msg.Value
 
 	var ord order.Order
@@ -102,15 +97,14 @@ func (or *Service) process(msg kafka.Message, str MessageListener) error {
 		return ErrWrongData
 	}
 
-	err = str.AddOrder(&ord)
-	if err != nil {
-		return ErrInternalStorage
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case or.out <- &ord:
+			zap.L().Info("new order succesfully get")
+			or.commitMSG(msg)
+			return nil
+		}
 	}
-
-	zap.L().Info(
-		fmt.Sprintf("new order succesfully added: %s", orderUID),
-	)
-
-	or.commitMSG(msg)
-	return nil
 }
