@@ -38,7 +38,7 @@ func NewTESTOrder(orderUID string) *order.Order {
 		Entry:       "WBIL",
 		Delivery: delivery.Delivery{
 			Name:    "Test Testov",
-			Phone:   "+9720000000",
+			Phone:   "123",
 			Zip:     "2639809",
 			City:    "Kiryat Mozkin",
 			Address: "Ploshad Mira 15",

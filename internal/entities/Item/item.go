@@ -9,17 +9,17 @@ import (
 )
 
 type Item struct {
-	ChrtID      int64   `db:"chrt_id" json:"chrt_id"`
-	TrackNumber string  `db:"track_number" json:"track_number"`
-	Price       float64 `db:"price" json:"price"`
-	RID         string  `db:"rid" json:"rid"`
-	Name        string  `db:"name" json:"name"`
-	Sale        uint8   `db:"sale" json:"sale"`
-	Size        string  `db:"size" json:"size"`
-	TotalPrice  float64 `db:"total_price" json:"total_price"`
-	NMID        int64   `db:"nm_id" json:"nm_id"`
-	Brand       string  `db:"brand" json:"brand"`
-	Status      int32   `db:"status" json:"status"`
+	ChrtID      int64   `db:"chrt_id" json:"chrt_id" validate:"required,gt=0"`
+	TrackNumber string  `db:"track_number" json:"track_number" validate:"required,alphanum"`
+	Price       float64 `db:"price" json:"price" validate:"required,gt=0"`
+	RID         string  `db:"rid" json:"rid" validate:"required"`
+	Name        string  `db:"name" json:"name" validate:"required,min=2,max=100"`
+	Sale        uint8   `db:"sale" json:"sale" validate:"lte=100"`
+	Size        string  `db:"size" json:"size" validate:"required"`
+	TotalPrice  float64 `db:"total_price" json:"total_price" validate:"required,gt=0"`
+	NMID        int64   `db:"nm_id" json:"nm_id" validate:"required,gt=0"`
+	Brand       string  `db:"brand" json:"brand" validate:"required,min=2,max=50"`
+	Status      int32   `db:"status" json:"status" validate:"required"`
 }
 
 func (i *Item) MarshalBinary() ([]byte, error) {

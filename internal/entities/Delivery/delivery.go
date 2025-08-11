@@ -6,13 +6,13 @@ import (
 )
 
 type Delivery struct {
-	Name    string `db:"name" json:"name"`
-	Phone   string `db:"phone" json:"phone"`
-	Zip     string `db:"zip" json:"zip"`
-	City    string `db:"city" json:"city"`
-	Address string `db:"address" json:"address"`
-	Region  string `db:"region" json:"region"`
-	Email   string `db:"email" json:"email"`
+	Name    string `db:"name" json:"name" validate:"required,min=2"`
+	Phone   string `db:"phone" json:"phone" validate:"required,e164"`
+	Zip     string `db:"zip" json:"zip" validate:"omitempty,numeric"`
+	City    string `db:"city" json:"city" validate:"required,min=2"`
+	Address string `db:"address" json:"address" validate:"required,min=2"`
+	Region  string `db:"region" json:"region" validate:"required"`
+	Email   string `db:"email" json:"email" validate:"required,email"`
 }
 
 func (d *Delivery) GetDataForSQLString() []any {

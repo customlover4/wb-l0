@@ -9,16 +9,16 @@ import (
 )
 
 type Payment struct {
-	Transaction  string  `db:"transaction" json:"transaction"`
-	RequestID    string  `db:"request_id" json:"request_id"`
-	Currency     string  `db:"currency" json:"currency"`
-	Provider     string  `db:"provider" json:"provider"`
-	Amount       float64 `db:"amount" json:"amount"`
-	PaymentDT    int64   `db:"payment_dt" json:"payment_dt"`
-	Bank         string  `db:"bank" json:"bank"`
-	DeliveryCost float64 `db:"delivery_cost" json:"delivery_cost"`
-	GoodsTotal   float64 `db:"goods_total" json:"goods_total"`
-	CustomFee    float64 `db:"custom_fee" json:"custom_fee"`
+	Transaction  string  `db:"transaction" json:"transaction" validate:"required"`
+	RequestID    string  `db:"request_id" json:"request_id" validate:"omitempty,alphanum"`
+	Currency     string  `db:"currency" json:"currency" validate:"required,iso4217"`
+	Provider     string  `db:"provider" json:"provider" validate:"required"`
+	Amount       float64 `db:"amount" json:"amount" validate:"required,gt=0"`
+	PaymentDT    int64   `db:"payment_dt" json:"payment_dt" validate:"required"`
+	Bank         string  `db:"bank" json:"bank" validate:"required"`
+	DeliveryCost float64 `db:"delivery_cost" json:"delivery_cost" validate:"gte=0"`
+	GoodsTotal   float64 `db:"goods_total" json:"goods_total" validate:"required,gte=0"`
+	CustomFee    float64 `db:"custom_fee" json:"custom_fee" validate:"gte=0"`
 }
 
 func (p *Payment) GetDataForSQLString() []any {

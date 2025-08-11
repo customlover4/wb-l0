@@ -11,20 +11,20 @@ import (
 )
 
 type Order struct {
-	OrderUID          string            `db:"order_uid" json:"order_uid"`
-	TrackNumber       string            `db:"track_number" json:"track_number"`
-	Entry             string            `db:"entry" json:"entry"`
-	Delivery          delivery.Delivery `db:"delivery" json:"delivery"`
-	Payment           payment.Payment   `db:"payment" json:"payment"`
-	Items             []item.Item       `db:"items" json:"items"`
-	Locale            string            `db:"locale" json:"locale"`
-	InternalSignature string            `db:"internal_signature" json:"internal_signature"`
-	CustomerID        string            `db:"customer_id" json:"customer_id"`
-	DeliveryService   string            `db:"delivery_service" json:"delivery_service"`
-	ShardKey          string            `db:"shardkey" json:"shardkey"`
-	SMID              int64             `db:"sm_id" json:"sm_id"`
-	DateCreated       string            `db:"date_created" json:"date_created"`
-	OOFShard          string            `db:"oof_shard" json:"oof_shard"`
+	OrderUID          string            `db:"order_uid" json:"order_uid" validate:"required,alphanum"`
+	TrackNumber       string            `db:"track_number" json:"track_number" validate:"required"`
+	Entry             string            `db:"entry" json:"entry" validate:"required,alpha,uppercase"`
+	Delivery          delivery.Delivery `db:"delivery" json:"delivery" validate:"required"`
+	Payment           payment.Payment   `db:"payment" json:"payment" validate:"required"`
+	Items             []item.Item       `db:"items" json:"items" validate:"required,min=1,dive"`
+	Locale            string            `db:"locale" json:"locale" validate:"required,oneof=ru en fr de"`
+	InternalSignature string            `db:"internal_signature" json:"internal_signature" validate:"omitempty"`
+	CustomerID        string            `db:"customer_id" json:"customer_id" validate:"required"`
+	DeliveryService   string            `db:"delivery_service" json:"delivery_service" validate:"required"`
+	ShardKey          string            `db:"shardkey" json:"shardkey" validate:"required,numeric"`
+	SMID              int64             `db:"sm_id" json:"sm_id" validate:"required,gt=0"`
+	DateCreated       string            `db:"date_created" json:"date_created" validate:"required"`
+	OOFShard          string            `db:"oof_shard" json:"oof_shard" validate:"required,numeric"`
 }
 
 func (o *Order) GetDataForSQLString(DeliveryID, PaymentID int64) []any {

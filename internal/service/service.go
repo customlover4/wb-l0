@@ -10,6 +10,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
@@ -25,8 +26,9 @@ type OrderReader interface {
 }
 
 type Service struct {
-	reader OrderReader
-	out    chan *order.Order
+	reader   OrderReader
+	out      chan *order.Order
+	validate *validator.Validate
 }
 
 type MessageListener interface {
@@ -36,15 +38,16 @@ type MessageListener interface {
 
 func NewOrderReader(c chan *order.Order, cfg config.KafkaOrdersConfig) *Service {
 	return &Service{
-		out: c,
+		out:      c,
+		validate: validator.New(),
 
 		reader: kafka.NewReader(
 			kafka.ReaderConfig{
-				Brokers:   cfg.Brokers,
-				Topic:     cfg.Topic,
-				MinBytes:  cfg.MinBytes,
-				MaxBytes:  cfg.MaxBytes,
-				GroupID:   cfg.GroupID,
+				Brokers:  cfg.Brokers,
+				Topic:    cfg.Topic,
+				MinBytes: cfg.MinBytes,
+				MaxBytes: cfg.MaxBytes,
+				GroupID:  cfg.GroupID,
 			},
 		),
 	}
@@ -68,7 +71,12 @@ func (or *Service) ListenMessages(ctx context.Context) {
 				msg = or.retry()
 			}
 
-			or.process(ctx, msg)
+			err = or.process(ctx, msg)
+			if err != nil {
+				zap.L().Error("on processing new order: " + err.Error())
+			} else {
+				zap.L().Info("new order succesfully get")
+			}
 		}
 	}
 }
@@ -84,12 +92,17 @@ func (or *Service) process(ctx context.Context, msg kafka.Message) error {
 		return ErrWrongData
 	}
 
+	err = or.validate.Struct(ord)
+	if err != nil {
+		or.commitMSG(msg)
+		return errors.New("Validation failed: " + err.Error())
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case or.out <- &ord:
-			zap.L().Info("new order succesfully get")
 			or.commitMSG(msg)
 			return nil
 		}
