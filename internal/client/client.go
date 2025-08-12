@@ -10,7 +10,9 @@ import (
 	"first-task/internal/storage/redisStorage"
 	webapp "first-task/internal/web-app"
 	"first-task/internal/web-app/handlers"
-	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -20,8 +22,6 @@ type Client struct {
 	str Storager
 	wa  WebApper
 	srv Servicer
-
-	ordersChannel chan *order.Order
 
 	cfg *config.Config
 }
@@ -45,13 +45,11 @@ type WebApper interface {
 }
 
 func NewClient(cfg *config.Config) *Client {
-	out := make(chan *order.Order)
-
 	str := storage.NewStorage(
 		redisStorage.NewRedisStorage(cfg.RedisConfig),
 		postgres.NewPostgres(cfg.PostgresConfig),
 	)
-	srv := service.NewOrderReader(out, cfg.KafkaOrdersConfig)
+	srv := service.NewOrderReader(str, cfg.KafkaOrdersConfig)
 	wa := webapp.NewWebApp()
 
 	return &Client{
@@ -59,8 +57,6 @@ func NewClient(cfg *config.Config) *Client {
 		wa:  wa,
 		srv: srv,
 		cfg: cfg,
-
-		ordersChannel: out,
 	}
 }
 
@@ -71,47 +67,22 @@ func (c *Client) Init() {
 			"can't load initial data, skipping this | Err: " + err.Error(),
 		)
 	}
-	
-	go c.listenMessages()
+
+	serviceCtx, finishService := context.WithCancel(context.Background())
+	defer finishService()
+	go c.srv.ListenMessages(serviceCtx)
 
 	c.wa.CreateServer(c.str, c.cfg.WebConfig)
 	go c.wa.StartServer()
-}
 
-func (c *Client) listenMessages() {
-	ctx, finish := context.WithCancel(context.Background())
-	defer finish()
-
-	go c.srv.ListenMessages(ctx)
-
-	for v := range c.ordersChannel {
-		err := c.str.AddOrder(v)
-		if err != nil {
-			zap.L().Warn("DB is down, trying retry: " + err.Error())
-
-			c.retry(v)
-		}
-
-		zap.L().Info(fmt.Sprintf("new order added: %s", v.OrderUID))
-	}
-}
-
-func (c *Client) retry(ord *order.Order) {
-	for {
-		for i := 0; i < 5; i++ {
-			err := c.str.AddOrder(ord)
-			if err == nil {
-				zap.L().Info("DB retrying success")
-				return
-			}
-			time.Sleep(time.Second * 5)
-			zap.L().Error(
-				"DB still down, retrying again...\n" + err.Error(),
-			)
-		}
-		zap.L().Error("So much attemps retry DB. Waiting 5 minutes and try again.")
-		time.Sleep(time.Minute * 5)
-	}
+	// gracefull shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+	zap.L().Info("stopping app")
+	finishService()
+	c.Shutdown()
+	time.Sleep(time.Second * 1)
 }
 
 func (c *Client) Shutdown() {

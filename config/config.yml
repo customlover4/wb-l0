@@ -21,6 +21,9 @@ redis:
 kafka:
   brokers:
     - "localhost:9092"
+    # - "localhost:29092"
+    # - "localhost:29094"
+    # - "localhost:29096"
   topic: "orders_new_event"
   partition: 0
   min_bytes: 1

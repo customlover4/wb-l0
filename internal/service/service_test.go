@@ -6,6 +6,7 @@ import (
 	order "first-task/internal/entities/Order"
 	"testing"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -29,6 +30,12 @@ type TestCase struct {
 	msg    kafka.Message
 }
 
+type OrderAdderMock struct{}
+
+func (oa *OrderAdderMock) AddOrder(ord *order.Order) error {
+	return nil
+}
+
 func TestMSGProcess(t *testing.T) {
 	var tests = []TestCase{
 		{
@@ -49,18 +56,18 @@ func TestMSGProcess(t *testing.T) {
 		},
 		{
 			Number: 3,
-			Err:    ErrWrongData,
+			Err:    ErrNotValidData,
 			msg: kafka.Message{
 				Key:   []byte("testCase5"),
 				Value: testErrorJSONWrongFields,
 			},
 		},
 	}
-
-	c := make(chan *order.Order, len(tests))
+	validate := validator.New()
 	srv := Service{
-		reader: &KafkaReaderMock{},
-		out:    c,
+		reader:   &KafkaReaderMock{},
+		str:      &OrderAdderMock{},
+		validate: validate,
 	}
 
 	ctx, finish := context.WithCancel(context.Background())
@@ -77,12 +84,11 @@ func TestMSGProcess(t *testing.T) {
 			t.Logf("Success, Testcase: %d", v.Number)
 		}
 	}
-	close(c)
 }
 
 var testJSON = []byte(`{
    "order_uid": "test",
-   "track_number": "WBILMTESTTRACK",
+   "track_number": "hi how are you",
    "entry": "WBIL",
    "delivery": {
       "name": "Test Testov",
@@ -132,11 +138,11 @@ var testJSON = []byte(`{
 
 var testErrorJSONWrongFields = []byte(`{
    "order_uid": "testError",
-   "track_number": 12,
+   "track_number": "isdfuoidsj",
    "entry": "WBIL",
    "delivery": {
       "name": "Test Testov",
-      "phone": "+9720000000",
+      "phone": "345",
       "zip": "2639809",
       "city": "Kiryat Mozkin",
       "address": "Ploshad Mira 15",

@@ -32,7 +32,7 @@ func mockOrderToKafka(t *testing.T, brokerAddr string) string {
 
 	err = conn.CreateTopics(topicConfig)
 	require.NoError(t, err)
-
+	t.Log("wait for creating topic")
 	time.Sleep(time.Second * 5)
 
 	writer := kafka.NewWriter(kafka.WriterConfig{
@@ -44,6 +44,7 @@ func mockOrderToKafka(t *testing.T, brokerAddr string) string {
 	jsonData, err := json.Marshal(testOrder)
 	require.NoError(t, err)
 
+	t.Log("wait for sending message to kafka")
 	err = writer.WriteMessages(
 		context.Background(),
 		kafka.Message{
@@ -110,13 +111,13 @@ func TestNewOrder(t *testing.T) {
 					Topic:    KafkaTopic,
 					MinBytes: 1,
 					MaxBytes: 10e6,
-					GroupID: "my-test-group",
+					GroupID:  "my-test-group",
 				},
 			},
 		)
 		defer cli.Shutdown()
 
-		cli.Init()
+		go cli.Init()
 
 		orderUID := mockOrderToKafka(t, brokerAddr)
 		t.Log("Wait for adding to storage...")

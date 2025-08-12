@@ -5,10 +5,6 @@ import (
 	"first-task/internal/config"
 	"first-task/pkg/logger"
 	"flag"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	_ "first-task/docs"
 
@@ -32,14 +28,5 @@ func main() {
 	cfg := config.MustLoad(*configFile)
 
 	c := client.NewClient(cfg)
-
 	c.Init()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	<-sigChan
-	zap.L().Info("stopping app")
-	c.Shutdown()
-	time.Sleep(time.Second * 1)
 }

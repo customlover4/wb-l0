@@ -7,7 +7,6 @@ import (
 	"first-task/internal/config"
 	order "first-task/internal/entities/Order"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -16,6 +15,8 @@ import (
 )
 
 var ErrWrongData = errors.New("can't unmarshal json from kafka msg")
+var ErrContextIsDone = errors.New("context is done")
+var ErrNotValidData = errors.New("not valid data")
 
 type OrderReader interface {
 	ReadMessage(context.Context) (kafka.Message, error)
@@ -25,14 +26,20 @@ type OrderReader interface {
 
 type Service struct {
 	reader   OrderReader
-	out      chan *order.Order
+	str      OrderAdder
 	validate *validator.Validate
+	cfg      config.KafkaOrdersConfig
 }
 
-func NewOrderReader(c chan *order.Order, cfg config.KafkaOrdersConfig) *Service {
+type OrderAdder interface {
+	AddOrder(*order.Order) error
+}
+
+func NewOrderReader(str OrderAdder, cfg config.KafkaOrdersConfig) *Service {
 	return &Service{
-		out:      c,
 		validate: validator.New(),
+		str:      str,
+		cfg:      cfg,
 
 		reader: kafka.NewReader(
 			kafka.ReaderConfig{
@@ -46,69 +53,73 @@ func NewOrderReader(c chan *order.Order, cfg config.KafkaOrdersConfig) *Service 
 	}
 }
 
-func (or *Service) ListenMessages(ctx context.Context) {
+func (s *Service) ListenMessages(ctx context.Context) {
 	zap.L().Info("start listening kafka messages")
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			msg, err := or.reader.ReadMessage(context.Background())
-			if errors.Is(err, io.EOF) {
-				break
-			} else if err != nil {
-				zap.L().Error(
-					"Kafka is down, trying retry... (error: " + err.Error() + ")",
-				)
-
-				msg = or.retry()
+			msg, err := s.reader.ReadMessage(context.Background())
+			if err != nil {
+				zap.L().Error("kafka down: " + err.Error())
+				msg, err = s.retryKafka(ctx)
+				if errors.Is(err, ErrContextIsDone) {
+					return
+				}
+				zap.L().Info("kafka is up")
 			}
 
-			err = or.process(ctx, msg)
+			err = s.process(ctx, msg)
 			if err != nil {
 				zap.L().Error("on processing new order: " + err.Error())
 			} else {
-				zap.L().Info("new order succesfully get")
+				zap.L().Info("new order succesfully added")
 			}
 		}
 	}
 }
 
-func (or *Service) process(ctx context.Context, msg kafka.Message) error {
+func (s *Service) process(ctx context.Context, msg kafka.Message) error {
 	const op = "internal.service.process"
 
 	jsonValue := msg.Value
-
 	var ord order.Order
 	err := json.Unmarshal(jsonValue, &ord)
 	if err != nil {
-		or.commitMSG(msg)
-		return fmt.Errorf("%s: %w", op, ErrWrongData)
+		s.commitMSG(msg)
+		return fmt.Errorf("%s: %w", op, errors.Join(ErrWrongData, err))
 	}
 
-	err = or.validate.Struct(ord)
+	err = s.validate.Struct(ord)
 	if err != nil {
-		or.commitMSG(msg)
-		return fmt.Errorf("%s: order validation failed (%w)", op, err)
+		s.commitMSG(msg)
+		return fmt.Errorf("%s: %w", op, errors.Join(ErrNotValidData, err))
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case or.out <- &ord:
-			or.commitMSG(msg)
+		default:
+			err := s.str.AddOrder(&ord)
+			if err != nil {
+				zap.L().Error("err on adding new order to db" + err.Error())
+				s.retry(&ord)
+			}
+
+			s.commitMSG(msg)
 			return nil
 		}
 	}
 }
 
-func (or *Service) commitMSG(msg kafka.Message) {
-	err := or.reader.CommitMessages(context.Background(), msg)
+func (s *Service) commitMSG(msg kafka.Message) {
+	err := s.reader.CommitMessages(context.Background(), msg)
 	if err != nil {
 		for {
 			for i := 0; i < 5; i++ {
-				err := or.reader.CommitMessages(context.Background(), msg)
+				err := s.reader.CommitMessages(context.Background(), msg)
 				if err == nil {
 					return
 				}
@@ -120,18 +131,17 @@ func (or *Service) commitMSG(msg kafka.Message) {
 	}
 }
 
-func (or *Service) retry() kafka.Message {
+func (s *Service) retry(ord *order.Order) {
 	for {
 		for i := 0; i < 5; i++ {
-			msg, err := or.reader.ReadMessage(context.Background())
-			if errors.Is(err, io.EOF) {
-				break
-			} else if err == nil {
-				return msg
+			err := s.str.AddOrder(ord)
+			if err == nil {
+				zap.L().Info("DB retrying success")
+				return
 			}
-			time.Sleep(time.Second * 5)
+			time.Sleep(time.Second * 10)
 			zap.L().Error(
-				"Kafka still down, retrying again...\n" + err.Error(),
+				"DB still down, retrying again...\n" + err.Error(),
 			)
 		}
 		zap.L().Error("So much attemps retry DB. Waiting 5 minutes and try again.")
@@ -139,9 +149,34 @@ func (or *Service) retry() kafka.Message {
 	}
 }
 
-func (or *Service) Shutdown() {
-	if err := or.reader.Close(); err != nil {
+func (s *Service) retryKafka(ctx context.Context) (kafka.Message, error) {
+	for {
+		select {
+		case <-ctx.Done():
+			return kafka.Message{}, errors.New("context is done")
+		default:
+			s.reader.Close()
+			s.reader = kafka.NewReader(
+				kafka.ReaderConfig{
+					Brokers:  s.cfg.Brokers,
+					Topic:    s.cfg.Topic,
+					MinBytes: s.cfg.MinBytes,
+					MaxBytes: s.cfg.MaxBytes,
+					GroupID:  s.cfg.GroupID,
+				},
+			)
+			msg, err := s.reader.ReadMessage(context.Background())
+			if err == nil {
+				return msg, nil
+			}
+			zap.L().Error("kafka still down, retry again...")
+			time.Sleep(time.Second * 5)
+		}
+	}
+}
+
+func (s *Service) Shutdown() {
+	if err := s.reader.Close(); err != nil {
 		zap.L().Error("error on closing reader")
 	}
-	close(or.out)
 }
