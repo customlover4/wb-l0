@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	delivery "first-task/internal/entities/Delivery"
 	item "first-task/internal/entities/Item"
 	order "first-task/internal/entities/Order"
@@ -38,7 +39,7 @@ func NewTESTOrder(orderUID string) *order.Order {
 		Entry:       "WBIL",
 		Delivery: delivery.Delivery{
 			Name:    "Test Testov",
-			Phone:   "123",
+			Phone:   "+79000000000",
 			Zip:     "2639809",
 			City:    "Kiryat Mozkin",
 			Address: "Ploshad Mira 15",
@@ -110,25 +111,41 @@ func NewTESTOrder(orderUID string) *order.Order {
 }
 
 func main() {
+	topic := "orders_new_event"
+
+	brokers := []string{"localhost:9092"}
 	conn, err := kafka.Dial("tcp", "localhost:9092")
 	if err != nil {
-		panic(err)
+		panic(err.Error() + " on connection")
 	}
-	defer conn.Close()
-	topic := "orders_new_event"
 	topicConfig := kafka.TopicConfig{
 		Topic:             topic,
 		NumPartitions:     3,
 		ReplicationFactor: 1,
+		// ReplicaAssignments: []kafka.ReplicaAssignment{
+		// 	{
+		// 		Partition: 0,
+		// 		Replicas:  []int{1, 2, 3},
+		// 	},
+		// 	{
+		// 		Partition: 1,
+		// 	},
+		// 	{
+		// 		Partition: 2,
+		// 	},
+		// },
 	}
 	err = conn.CreateTopics(topicConfig)
 	if err != nil {
-		panic(err)
+		panic(err.Error() + " on creating topic")
 	}
+	conn.Close()
 
 	writer := kafka.NewWriter(kafka.WriterConfig{
-		Brokers: []string{"localhost:9092"},
-		Topic:   topic,
+		Brokers:      brokers,
+		Topic:        topic,
+		MaxAttempts:  10,
+		WriteTimeout: 100 * time.Millisecond,
 	})
 	defer writer.Close()
 
@@ -148,9 +165,28 @@ func main() {
 				Value: kafkaValue,
 			},
 		)
-
+		fmt.Println("sended")
 		if err != nil {
-			fmt.Println("Error on writing new order to kafka " + err.Error())
+			var kafkaErr kafka.WriteErrors
+			errors.As(err, &kafkaErr)
+			for _, v := range kafkaErr {
+				if errors.Is(v, kafka.NotLeaderForPartition) {
+					for {
+						fmt.Println("retry")
+						err = writer.WriteMessages(
+							context.Background(),
+							kafka.Message{
+								Key:   []byte(ord.OrderUID),
+								Value: kafkaValue,
+							},
+						)
+						if err == nil {
+							break
+						}
+					}
+					fmt.Println("success")
+				}
+			}
 			continue
 		}
 
