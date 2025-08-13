@@ -20,14 +20,15 @@ redis:
 
 kafka:
   brokers:
+    # - "localhost:9092"
     - "localhost:9092"
-    # - "localhost:29092"
-    # - "localhost:29094"
-    # - "localhost:29096"
+    - "localhost:9094"
+    - "localhost:9096"
+    - "localhost:9098"
   topic: "orders_new_event"
   partition: 0
   min_bytes: 1
   max_bytes: 10e6
-  group_id: "my-group-id"
+  group_id: "my-test-id"
 
 initial_data_size: 100

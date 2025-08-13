@@ -3,17 +3,17 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	delivery "first-task/internal/entities/Delivery"
 	item "first-task/internal/entities/Item"
 	order "first-task/internal/entities/Order"
 	payment "first-task/internal/entities/Payment"
 	"fmt"
 	"math/rand"
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/segmentio/kafka-go"
-	"go.uber.org/zap"
 )
 
 func init() {
@@ -113,48 +113,62 @@ func NewTESTOrder(orderUID string) *order.Order {
 func main() {
 	topic := "orders_new_event"
 
-	brokers := []string{"localhost:9092"}
-	conn, err := kafka.Dial("tcp", "localhost:9092")
-	if err != nil {
-		panic(err.Error() + " on connection")
+	brokers := []string{"localhost:9092", "localhost:9094", "localhost:9096", "localhost:9098"}
+
+	for _, b := range brokers {
+		conn, err := kafka.Dial("tcp", b)
+		if err != nil {
+			panic(err.Error() + " on connection")
+		}
+		defer conn.Close()
+
+		controller, err := conn.Controller()
+		if err != nil {
+			panic(err.Error())
+		}
+
+		controllerConn, err := kafka.Dial(
+			"tcp",
+			net.JoinHostPort(controller.Host, strconv.Itoa(controller.Port)),
+		)
+		if err != nil {
+			panic(err.Error())
+		}
+		defer controllerConn.Close()
+
+		topicConfig := kafka.TopicConfig{
+			Topic:             topic,
+			NumPartitions:     6,
+			ReplicationFactor: 3,
+			ConfigEntries: []kafka.ConfigEntry{
+				{
+					ConfigName:  "min.insync.replicas",
+					ConfigValue: "2",
+				},
+			},
+		}
+		err = controllerConn.CreateTopics(topicConfig)
+		if err != nil {
+			panic(err.Error() + " on creating topic")
+		}
 	}
-	topicConfig := kafka.TopicConfig{
-		Topic:             topic,
-		NumPartitions:     3,
-		ReplicationFactor: 1,
-		// ReplicaAssignments: []kafka.ReplicaAssignment{
-		// 	{
-		// 		Partition: 0,
-		// 		Replicas:  []int{1, 2, 3},
-		// 	},
-		// 	{
-		// 		Partition: 1,
-		// 	},
-		// 	{
-		// 		Partition: 2,
-		// 	},
-		// },
-	}
-	err = conn.CreateTopics(topicConfig)
-	if err != nil {
-		panic(err.Error() + " on creating topic")
-	}
-	conn.Close()
+
+	time.Sleep(time.Second * 3)
 
 	writer := kafka.NewWriter(kafka.WriterConfig{
 		Brokers:      brokers,
 		Topic:        topic,
 		MaxAttempts:  10,
+		BatchTimeout: 100 * time.Millisecond,
 		WriteTimeout: 100 * time.Millisecond,
 	})
 	defer writer.Close()
 
-	for range time.NewTicker(time.Second * 1).C {
+	for range time.NewTicker(time.Millisecond).C {
 		ord := NewTESTOrder(GenerateRandomString(30))
 
 		kafkaValue, err := json.MarshalIndent(ord, " ", "  ")
 		if err != nil {
-			zap.L().Error("on marshaling new test order for kafka")
 			continue
 		}
 
@@ -165,28 +179,8 @@ func main() {
 				Value: kafkaValue,
 			},
 		)
-		fmt.Println("sended")
 		if err != nil {
-			var kafkaErr kafka.WriteErrors
-			errors.As(err, &kafkaErr)
-			for _, v := range kafkaErr {
-				if errors.Is(v, kafka.NotLeaderForPartition) {
-					for {
-						fmt.Println("retry")
-						err = writer.WriteMessages(
-							context.Background(),
-							kafka.Message{
-								Key:   []byte(ord.OrderUID),
-								Value: kafkaValue,
-							},
-						)
-						if err == nil {
-							break
-						}
-					}
-					fmt.Println("success")
-				}
-			}
+			fmt.Println(err.Error())
 			continue
 		}
 

@@ -40,15 +40,7 @@ func NewOrderReader(str OrderAdder, cfg config.KafkaOrdersConfig) *Service {
 		str:      str,
 		cfg:      cfg,
 
-		reader: kafka.NewReader(
-			kafka.ReaderConfig{
-				Brokers:  cfg.Brokers,
-				Topic:    cfg.Topic,
-				MinBytes: cfg.MinBytes,
-				MaxBytes: cfg.MaxBytes,
-				GroupID:  cfg.GroupID,
-			},
-		),
+		reader: newReader(cfg),
 	}
 }
 
@@ -110,15 +102,14 @@ func (s *Service) process(ctx context.Context, msg kafka.Message) error {
 	}
 }
 
-func (s *Service) newReader() {
-	s.reader.Close()
-	s.reader = kafka.NewReader(
+func newReader(cfg config.KafkaOrdersConfig) *kafka.Reader {
+	return kafka.NewReader(
 		kafka.ReaderConfig{
-			Brokers:  s.cfg.Brokers,
-			Topic:    s.cfg.Topic,
-			MinBytes: s.cfg.MinBytes,
-			MaxBytes: s.cfg.MaxBytes,
-			GroupID:  s.cfg.GroupID,
+			Brokers:  cfg.Brokers,
+			Topic:    cfg.Topic,
+			MinBytes: cfg.MinBytes,
+			MaxBytes: cfg.MaxBytes,
+			GroupID:  cfg.GroupID,
 		},
 	)
 }
@@ -128,15 +119,21 @@ func (s *Service) commitMSG(msg kafka.Message) {
 	if err != nil {
 		for {
 			for i := 0; i < 5; i++ {
+				// s.reader.Close()
+
+				// r := newReader(s.cfg)
+
+				time.Sleep(time.Second * 10)
+
+				// s.reader = r
+
 				err := s.reader.CommitMessages(context.Background(), msg)
 				if err == nil {
 					return
 				}
-				s.newReader()
+
 				zap.L().Error("can't commit message(kafka): " + err.Error())
-				time.Sleep(time.Second * 10)
 			}
-			time.Sleep(time.Minute * 5)
 		}
 	}
 }
@@ -165,13 +162,16 @@ func (s *Service) retryKafka(ctx context.Context) kafka.Message {
 		case <-ctx.Done():
 			return kafka.Message{}
 		default:
-			s.newReader()
+			// s.reader.Close()
+			// s.reader := newReader(s.cfg)
+
+			time.Sleep(time.Second * 10)
+
 			msg, err := s.reader.ReadMessage(context.Background())
 			if err == nil {
 				return msg
 			}
 			zap.L().Error("kafka still down, retry again... | Err: " + err.Error())
-			time.Sleep(time.Second * 10)
 		}
 	}
 }
